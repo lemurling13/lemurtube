@@ -51,8 +51,13 @@ document.addEventListener('DOMContentLoaded', () => {
     views.player.classList.add('hidden');
     views.settings.classList.remove('hidden');
     views.settings.classList.add('active');
+    
+    // Populate API Key from storage
+    document.getElementById('input-youtube-api-key').value = SettingsStore.getYoutubeApiKey();
+    
     renderSettingsBuckets(); // Re-render in case of changes
   });
+
 
   document.getElementById('btn-close-settings').addEventListener('click', () => {
     views.settings.classList.remove('active');
@@ -89,6 +94,13 @@ document.addEventListener('DOMContentLoaded', () => {
     populateBucketSelector();
     alert('Buckets configuration saved successfully.');
   });
+
+  document.getElementById('btn-save-api-key').addEventListener('click', () => {
+      const key = document.getElementById('input-youtube-api-key').value.trim();
+      SettingsStore.setYoutubeApiKey(key);
+      alert('API Key saved successfully to your device!');
+  });
+
 
   document.getElementById('btn-export-data').addEventListener('click', async () => {
      try {

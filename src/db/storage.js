@@ -90,8 +90,17 @@ export const SettingsStore = {
      const raw = localStorage.getItem('lemur_playback_state');
      if (!raw) return null;
      try { return JSON.parse(raw); } catch { return null; }
+  },
+
+  getYoutubeApiKey() {
+    return localStorage.getItem('lemur_youtube_api_key') || '';
+  },
+
+  setYoutubeApiKey(key) {
+    localStorage.setItem('lemur_youtube_api_key', key);
   }
 };
+
 
 export const HistoryStore = {
   dbName: 'LemurTubeHistory',

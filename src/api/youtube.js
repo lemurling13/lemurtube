@@ -1,4 +1,4 @@
-import { YOUTUBE_API_KEY } from '../config.js';
+import { SettingsStore } from '../db/storage.js';
 
 const BASE_URL = 'https://www.googleapis.com/youtube/v3';
 
@@ -15,7 +15,8 @@ export function parseDuration(duration) {
 }
 
 async function fetchAPI(endpoint, params) {
-  if (!YOUTUBE_API_KEY) throw new Error('No API Key configured. Please add it to src/config.js');
+  const apiKey = SettingsStore.getYoutubeApiKey();
+  if (!apiKey) throw new Error('No API Key configured. Please add it in Settings.');
 
   const searchParams = new URLSearchParams();
   for (const key in params) {
@@ -23,7 +24,7 @@ async function fetchAPI(endpoint, params) {
       searchParams.append(key, params[key]);
     }
   }
-  searchParams.append('key', YOUTUBE_API_KEY);
+  searchParams.append('key', apiKey);
 
   const response = await fetch(`${BASE_URL}/${endpoint}?${searchParams.toString()}`);
   if (!response.ok) {
