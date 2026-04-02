@@ -154,7 +154,7 @@ export const HistoryStore = {
 
   async markWatched(video) {
     if (!this.db) await this.init();
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       const tx = this.db.transaction('watched', 'readwrite');
       tx.objectStore('watched').put({ 
          id: video.id, 
@@ -165,7 +165,9 @@ export const HistoryStore = {
          timestamp: Date.now() 
       });
       tx.oncomplete = () => resolve();
+      tx.onabort = (e) => reject(e.target.error || "Transaction aborted");
     });
+
   },
 
   async isWatched(id) {
@@ -204,7 +206,7 @@ export const HistoryStore = {
 
   async markSaved(video) {
     if (!this.db) await this.init();
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       const tx = this.db.transaction('saved', 'readwrite');
       tx.objectStore('saved').put({ 
          id: video.id, 
@@ -215,24 +217,31 @@ export const HistoryStore = {
          timestamp: Date.now() 
       });
       tx.oncomplete = () => resolve();
+      tx.onabort = (e) => reject(e.target.error || "Transaction aborted");
     });
+
   },
 
   async getAllStore(storeName) {
     if (!this.db) await this.init();
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       const tx = this.db.transaction(storeName, 'readonly');
       const req = tx.objectStore(storeName).getAll();
       req.onsuccess = () => resolve(req.result || []);
+      req.onerror = (e) => reject(e.target.error || "getAllStore failed");
+      tx.onabort = (e) => reject(e.target.error || "Transaction aborted");
     });
   },
 
+
   async removeFromStore(storeName, id) {
     if (!this.db) await this.init();
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       const tx = this.db.transaction(storeName, 'readwrite');
       tx.objectStore(storeName).delete(id);
       tx.oncomplete = () => resolve();
+      tx.onabort = (e) => reject(e.target.error || "Transaction aborted");
     });
+
   }
 };

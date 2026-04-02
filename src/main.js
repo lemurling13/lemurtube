@@ -130,7 +130,70 @@ document.addEventListener('DOMContentLoaded', () => {
      }
   });
 
+  document.getElementById('btn-export-text').addEventListener('click', async () => {
+      try {
+          const data = {
+              buckets: SettingsStore.getBuckets(),
+              activeBucket: SettingsStore.getActiveBucketId(),
+              autoplay: SettingsStore.getAutoplay(),
+              history: {
+                  saved: await HistoryStore.getAllStore('saved'),
+                  watched: await HistoryStore.getAllStore('watched'),
+                  dismissed: await HistoryStore.getAllStore('dismissed')
+              }
+          };
+          const text = JSON.stringify(data, null, 2);
+          const area = document.getElementById('textarea-backup-io');
+          area.value = text;
+          area.select();
+          
+          if (navigator.clipboard) {
+              await navigator.clipboard.writeText(text);
+              alert('Backup text generated and COPIED to clipboard!');
+          } else {
+              alert('Backup text generated! Highlight the text inside the box and copy it manually.');
+          }
+      } catch (e) {
+          console.error('Export Text Error:', e);
+          alert('Failed to generate backup text.');
+      }
+  });
+
+  document.getElementById('btn-import-text').addEventListener('click', async () => {
+      const area = document.getElementById('textarea-backup-io');
+      const text = area.value.trim();
+      if (!text) {
+          alert('Please paste some backup text into the box first!');
+          return;
+      }
+      
+      try {
+          const data = JSON.parse(text);
+          if (data.buckets) SettingsStore.setBuckets(data.buckets);
+          if (data.activeBucket) SettingsStore.setActiveBucketId(data.activeBucket);
+          if (typeof data.autoplay !== 'undefined') SettingsStore.setAutoplay(data.autoplay);
+          
+          if (data.history) {
+              if (data.history.watched) {
+                 for (const v of data.history.watched) await HistoryStore.markWatched(v);
+              }
+              if (data.history.dismissed) {
+                 for (const v of data.history.dismissed) await HistoryStore.markDismissed(v);
+              }
+              if (data.history.saved) {
+                 for (const v of data.history.saved) await HistoryStore.markSaved(v);
+              }
+          }
+          alert('Import Successful! Application will now reload.');
+          location.reload();
+      } catch (err) {
+          console.error('Import Text Error:', err);
+          alert('Failed to import text. Ensure the text is a valid LemurTube backup block.');
+      }
+  });
+
   document.getElementById('input-import-data').addEventListener('change', async (e) => {
+
       const file = e.target.files[0];
       if (!file) return;
 
