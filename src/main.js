@@ -13,7 +13,20 @@ document.addEventListener('DOMContentLoaded', () => {
       .catch(err => console.error('Service Worker Error', err));
   }
 
+  if ('mediaSession' in navigator) {
+    navigator.mediaSession.setActionHandler('play', () => {
+        if (player && typeof player.playVideo === 'function') player.playVideo();
+    });
+    navigator.mediaSession.setActionHandler('pause', () => {
+        if (player && typeof player.pauseVideo === 'function') player.pauseVideo();
+    });
+    navigator.mediaSession.setActionHandler('nexttrack', () => {
+        document.getElementById('btn-skip-next').click();
+    });
+  }
+
   const views = {
+
     player: document.getElementById('player-view'),
     settings: document.getElementById('settings-view'),
     history: document.getElementById('history-view')
@@ -482,8 +495,19 @@ window.onYouTubeIframeAPIReady = () => {
 };
 
 function playVideo(videoObj, autoStart = true) {
+  if ('mediaSession' in navigator && videoObj) {
+      navigator.mediaSession.metadata = new MediaMetadata({
+          title: videoObj.title || 'LemurTube Loop',
+          artist: videoObj.channelTitle || 'YouTube',
+          artwork: [
+              { src: videoObj.thumbnail || './assets/icon-512.png', sizes: '512x512', type: 'image/png' }
+          ]
+      });
+  }
+
   const container = document.getElementById('youtube-player');
   container.innerHTML = '';
+
   
   if (player && typeof player.destroy === 'function') {
     player.destroy();

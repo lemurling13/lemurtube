@@ -499,3 +499,17 @@ button:active {
   border-left: 4px solid var(--primary-accent) !important;
   background-color: rgba(255, 90, 95, 0.05);
 }
+
+/* Landscape auto-maximize hack */
+@media (orientation: landscape) {
+  .video-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh !important;
+    max-height: 100vh !important;
+    z-index: 9999;
+  }
+}
+

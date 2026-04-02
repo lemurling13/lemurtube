@@ -12,6 +12,8 @@ const APP_URLS = [
   '/src/ui/queueDrawer.js'
 ];
 
+
+
 self.addEventListener('install', (e) => {
   e.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
