@@ -35,7 +35,7 @@ async function fetchAPI(endpoint, params) {
 }
 
 export const YouTubeApi = {
-  async fetchSearchByChannelId(channelId, query, maxResults = 25) {
+  async fetchSearchByChannelId(channelId, query, maxResults = 50) {
     const data = await fetchAPI('search', {
       part: 'snippet',
       channelId: channelId,
@@ -55,12 +55,12 @@ export const YouTubeApi = {
     }));
   },
 
-  async fetchUploadsByChannelId(channelId, maxResults = 15) {
+  async fetchUploadsByChannelId(channelId, maxResults = 50) {
     const playlistId = 'UU' + channelId.substring(2);
     return this.fetchPlaylistItems(playlistId, maxResults);
   },
   
-  async fetchPlaylistItems(playlistId, maxResults = 15) {
+  async fetchPlaylistItems(playlistId, maxResults = 50) {
     const data = await fetchAPI('playlistItems', {
       part: 'snippet',
       playlistId: playlistId,

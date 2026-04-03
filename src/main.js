@@ -25,7 +25,30 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  document.addEventListener('visibilitychange', () => {
+     if (document.hidden) {
+        console.log(`[Diagnostic Trace] App shifted to background. Trial forced resume hack.`);
+        if (player && typeof player.playVideo === 'function') player.playVideo();
+     }
+  });
+
+  const orientationQuery = window.matchMedia("(orientation: landscape)");
+  const handleOrientationChange = (e) => {
+      if (e.matches) {
+          document.body.classList.add('app-fullscreen');
+          console.log('[Diagnostic Trace] Entering Root Landscape Maximization');
+      } else {
+          document.body.classList.remove('app-fullscreen');
+          console.log('[Diagnostic Trace] Exiting Root Landscape Maximization');
+      }
+  };
+  orientationQuery.addEventListener('change', handleOrientationChange);
+  // Run once on load
+  handleOrientationChange(orientationQuery);
+
   const views = {
+
+
 
     player: document.getElementById('player-view'),
     settings: document.getElementById('settings-view'),

@@ -500,17 +500,21 @@ button:active {
   background-color: rgba(255, 90, 95, 0.05);
 }
 
-/* Landscape auto-maximize hack */
-@media (orientation: landscape) {
-  .video-container {
-    position: fixed !important;
-    inset: 0 !important;
-    width: 100vw !important;
-    height: 100vh !important;
-    max-height: 100vh !important;
-    z-index: 99999 !important;
-    background-color: #000 !important;
-  }
+/* Landscape auto-maximize root overlay */
+.app-fullscreen .video-container {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  max-height: 100vh !important;
+  z-index: 99999 !important;
+  background-color: #000 !important;
 }
+
+.app-fullscreen .app-top-bar,
+.app-fullscreen #queue-drawer {
+  display: none !important;
+}
+
 
 
