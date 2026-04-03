@@ -172,16 +172,18 @@ export const HistoryStore = {
 
   async isWatched(id) {
     if (!this.db) await this.init();
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       const tx = this.db.transaction('watched', 'readonly');
       const req = tx.objectStore('watched').get(id);
       req.onsuccess = () => resolve(!!req.result);
+      tx.onabort = (e) => reject(e.target.error || "Transaction aborted");
+      tx.onerror = (e) => reject(e.target.error || "Transaction failed");
     });
   },
 
   async markDismissed(video) {
     if (!this.db) await this.init();
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       const tx = this.db.transaction('dismissed', 'readwrite');
       tx.objectStore('dismissed').put({ 
          id: video.id, 
@@ -192,15 +194,19 @@ export const HistoryStore = {
          timestamp: Date.now() 
       });
       tx.oncomplete = () => resolve();
+      tx.onabort = (e) => reject(e.target.error || "Transaction aborted");
+      tx.onerror = (e) => reject(e.target.error || "Transaction failed");
     });
   },
 
   async isDismissed(id) {
     if (!this.db) await this.init();
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       const tx = this.db.transaction('dismissed', 'readonly');
       const req = tx.objectStore('dismissed').get(id);
       req.onsuccess = () => resolve(!!req.result);
+      tx.onabort = (e) => reject(e.target.error || "Transaction aborted");
+      tx.onerror = (e) => reject(e.target.error || "Transaction failed");
     });
   },
 
@@ -237,11 +243,12 @@ export const HistoryStore = {
   async removeFromStore(storeName, id) {
     if (!this.db) await this.init();
     return new Promise((resolve, reject) => {
+      console.log(`[Diagnostic Trace] Physically deleting habit key ${id} from store ${storeName}`);
       const tx = this.db.transaction(storeName, 'readwrite');
       tx.objectStore(storeName).delete(id);
       tx.oncomplete = () => resolve();
       tx.onabort = (e) => reject(e.target.error || "Transaction aborted");
     });
-
   }
+
 };

@@ -503,13 +503,14 @@ button:active {
 /* Landscape auto-maximize hack */
 @media (orientation: landscape) {
   .video-container {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100vw;
+    position: fixed !important;
+    inset: 0 !important;
+    width: 100vw !important;
     height: 100vh !important;
     max-height: 100vh !important;
-    z-index: 9999;
+    z-index: 99999 !important;
+    background-color: #000 !important;
   }
 }
+
 
