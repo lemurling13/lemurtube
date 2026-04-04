@@ -123,7 +123,9 @@ export const YouTubeApi = {
       title: v.snippet.title,
       channelId: v.snippet.channelId,
       channelTitle: v.snippet.channelTitle,
+      publishedAt: v.snippet.publishedAt,
       durationSec: parseDuration(v.contentDetails.duration)
     }));
+
   }
 };

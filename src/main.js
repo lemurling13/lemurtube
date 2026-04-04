@@ -32,19 +32,19 @@ document.addEventListener('DOMContentLoaded', () => {
      }
   });
 
-  const orientationQuery = window.matchMedia("(orientation: landscape)");
-  const handleOrientationChange = (e) => {
-      if (e.matches) {
+  const handleResize = () => {
+      if (window.innerWidth > window.innerHeight) {
           document.body.classList.add('app-fullscreen');
-          console.log('[Diagnostic Trace] Entering Root Landscape Maximization');
+          console.log('[Diagnostic Trace] Entering Root Landscape Maximization (Resize)');
       } else {
           document.body.classList.remove('app-fullscreen');
-          console.log('[Diagnostic Trace] Exiting Root Landscape Maximization');
+          console.log('[Diagnostic Trace] Exiting Root Landscape Maximization (Resize)');
       }
   };
-  orientationQuery.addEventListener('change', handleOrientationChange);
+  window.addEventListener('resize', handleResize);
   // Run once on load
-  handleOrientationChange(orientationQuery);
+  handleResize();
+
 
   const views = {
 

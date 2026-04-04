@@ -41,14 +41,16 @@ export const QueueEngine = {
         if (this.isTooShort(detail.durationSec)) { console.log(`[Diagnostic] Skipped "${raw.title}": Duration too short (${detail.durationSec}s)`); continue; }
 
         // 1. Enforce Recency Constraint (only_new)
-        if (sourceConfig?.recency === 'only_new' && raw.publishedAt) {
-           const pubDate = new Date(raw.publishedAt).getTime();
+        const dateToUse = detail.publishedAt || raw.publishedAt;
+        if (sourceConfig?.recency === 'only_new' && dateToUse) {
+           const pubDate = new Date(dateToUse).getTime();
            const DAYS_14 = 14 * 24 * 60 * 60 * 1000;
            if (Date.now() - pubDate > DAYS_14) {
               console.log(`[Diagnostic] Skipped "${raw.title}": Older than 14 days (Recency trigger)`);
               continue; 
            }
         }
+
 
         const isSht = this.isShort(detail.durationSec);
         
