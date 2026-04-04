@@ -32,18 +32,33 @@ document.addEventListener('DOMContentLoaded', () => {
      }
   });
 
-  const handleResize = () => {
-      if (window.innerWidth > window.innerHeight) {
+  const debugEl = document.getElementById('orientation-debug');
+  const handleOrientationUpdate = () => {
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      const isLandscape = w > h;
+      
+      if (debugEl) {
+          debugEl.innerHTML = `Dim: ${w}x${h} | Mode: ${isLandscape ? 'Land' : 'Port'}`;
+      }
+      
+      if (isLandscape) {
           document.body.classList.add('app-fullscreen');
-          console.log('[Diagnostic Trace] Entering Root Landscape Maximization (Resize)');
+          console.log('[Diagnostic Trace] Entering Root Landscape Maximization (Multi)');
       } else {
           document.body.classList.remove('app-fullscreen');
-          console.log('[Diagnostic Trace] Exiting Root Landscape Maximization (Resize)');
+          console.log('[Diagnostic Trace] Exiting Root Landscape Maximization (Multi)');
       }
   };
-  window.addEventListener('resize', handleResize);
+  
+  window.addEventListener('resize', handleOrientationUpdate);
+  window.addEventListener('orientationchange', handleOrientationUpdate);
+  if (screen.orientation) {
+      screen.orientation.addEventListener('change', handleOrientationUpdate);
+  }
   // Run once on load
-  handleResize();
+  handleOrientationUpdate();
+
 
 
   const views = {
@@ -138,33 +153,6 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
 
-  document.getElementById('btn-export-data').addEventListener('click', async () => {
-     try {
-         const data = {
-             buckets: SettingsStore.getBuckets(),
-             activeBucket: SettingsStore.getActiveBucketId(),
-             autoplay: SettingsStore.getAutoplay(),
-             history: {
-                 saved: await HistoryStore.getAllStore('saved'),
-                 watched: await HistoryStore.getAllStore('watched'),
-                 dismissed: await HistoryStore.getAllStore('dismissed')
-             }
-         };
-         
-         const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-         const url = URL.createObjectURL(blob);
-         const a = document.createElement('a');
-         a.href = url;
-         a.download = `lemurtube_backup_${new Date().toISOString().split('T')[0]}.json`;
-         document.body.appendChild(a);
-         a.click();
-         document.body.removeChild(a);
-         URL.revokeObjectURL(url);
-     } catch (e) {
-         console.error('Export Error:', e);
-         alert('Failed to export data. Check console.');
-     }
-  });
 
   document.getElementById('btn-export-text').addEventListener('click', async () => {
       try {
@@ -228,40 +216,6 @@ document.addEventListener('DOMContentLoaded', () => {
       }
   });
 
-  document.getElementById('input-import-data').addEventListener('change', async (e) => {
-
-      const file = e.target.files[0];
-      if (!file) return;
-
-      const reader = new FileReader();
-      reader.onload = async (event) => {
-          try {
-              const data = JSON.parse(event.target.result);
-              if (data.buckets) SettingsStore.setBuckets(data.buckets);
-              if (data.activeBucket) SettingsStore.setActiveBucketId(data.activeBucket);
-              if (typeof data.autoplay !== 'undefined') SettingsStore.setAutoplay(data.autoplay);
-              
-              if (data.history) {
-                  if (data.history.watched) {
-                     for (const v of data.history.watched) await HistoryStore.markWatched(v);
-                  }
-                  if (data.history.dismissed) {
-                     for (const v of data.history.dismissed) await HistoryStore.markDismissed(v);
-                  }
-                  if (data.history.saved) {
-                     for (const v of data.history.saved) await HistoryStore.markSaved(v);
-                  }
-              }
-              
-              alert('Import Successful! Application will now reload.');
-              location.reload();
-          } catch (err) {
-              console.error('Import Error:', err);
-              alert('Failed to import data. Ensure the file is a valid LemurTube backup.');
-          }
-      };
-      reader.readAsText(file);
-  });
 
   renderSettingsBuckets();
   populateBucketSelector();
