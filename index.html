@@ -96,23 +96,15 @@
       </div>
       
       <div class="settings-content">
-        <h3 style="margin-top: 0; border-bottom: 1px solid #333; padding-bottom: 8px;">Integrations</h3>
-        <div class="form-group" style="margin-bottom: 24px;">
-            <label for="input-youtube-api-key" style="display:block; margin-bottom: 6px; font-size: 0.9em; color: var(--text-secondary);">YouTube Data API v3 Key</label>
-            <div style="display: flex; gap: 8px;">
-                <input type="password" id="input-youtube-api-key" class="form-input" style="flex: 1; width: auto;" placeholder="Paste your API key here...">
-                <button id="btn-save-api-key" class="primary-btn" style="padding: 0 16px;">💾 Save</button>
-            </div>
-            <p class="help-text" style="font-size: 0.8em; margin-top: 4px;">This key is stored securely on your device and never uploaded to the repository.</p>
-        </div>
-
         <h3>Buckets Manager</h3>
+        <button id="btn-save-buckets" class="primary-btn" style="width: 100%; margin-top: 10px; margin-bottom: 12px;">Save All Buckets</button>
+
 
         <p class="help-text">Define up to 8 contexts below. Sources can be a mix of Channel IDs (UC..) and Playlist IDs (PL..).</p>
         <div id="buckets-accordion" class="buckets-accordion"></div>
         
         <button id="btn-add-bucket" class="secondary-btn" style="width: 100%; margin-top:12px; border: 1px dashed var(--border-color); background: transparent;">➕ Add New Bucket</button>
-        <button id="btn-save-buckets" class="primary-btn" style="width: 100%; margin-top:20px;">Save All Buckets</button>
+
 
         <h3 style="margin-top: 32px; border-bottom: 1px solid #333; padding-bottom: 8px;">Data Management</h3>
 
@@ -127,9 +119,22 @@
             <p class="help-text" style="font-size: 0.75em; margin-top: 6px;">Use this if your browser blocks the file download generator!</p>
         </div>
 
-        <div style="text-align: center; margin-top: 32px; padding-top: 16px; border-top: 1px solid var(--border-color); color: var(--text-secondary); font-size: 0.8rem; font-family: monospace;">
-            LemurTube Curator v1.6.4
+        <h3 style="margin-top: 32px; border-bottom: 1px solid #333; padding-bottom: 8px;">Integrations</h3>
+        <div class="form-group" style="margin-bottom: 24px;">
+            <label for="input-youtube-api-key" style="display:block; margin-bottom: 6px; font-size: 0.9em; color: var(--text-secondary);">YouTube Data API v3 Key</label>
+            <div style="display: flex; gap: 8px;">
+                <input type="password" id="input-youtube-api-key" class="form-input" style="flex: 1; width: auto;" placeholder="Paste your API key here...">
+                <button id="btn-save-api-key" class="primary-btn" style="padding: 0 16px;">💾 Save</button>
+            </div>
+            <p class="help-text" style="font-size: 0.8em; margin-top: 4px;">This key is stored securely on your device and never uploaded to the repository.</p>
         </div>
+
+        <div style="text-align: center; margin-top: 32px; padding-top: 16px; border-top: 1px solid var(--border-color); color: var(--text-secondary); font-size: 0.8rem; font-family: monospace;">
+            LemurTube Curator v1.6.5
+        </div>
+
+
+
 
 
         <div id="orientation-debug" style="text-align: center; color: var(--primary-accent); font-size: 0.7rem; font-family: monospace; margin-top: 4px;">
