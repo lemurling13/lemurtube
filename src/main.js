@@ -117,14 +117,108 @@ document.addEventListener('DOMContentLoaded', () => {
     views.player.classList.add('active');
   });
 
+  let currentHistoryOffset = 0;
+  const HISTORY_PAGE_SIZE = 10;
+  let currentHistoryStore = 'saved';
+  let historyRecordsCache = []; // Store fetched records to avoid refetching on load more
+
   const historyTabs = ['saved', 'watched', 'dismissed'];
   historyTabs.forEach(tab => {
      document.getElementById('tab-' + tab).addEventListener('click', (e) => {
         historyTabs.forEach(t => document.getElementById('tab-' + t).classList.remove('active'));
         e.target.classList.add('active');
-        renderHistoryTab(tab);
+        
+        currentHistoryStore = tab;
+        currentHistoryOffset = 0;
+        historyRecordsCache = [];
+        
+        const labelEl = document.getElementById('label-history-io');
+        if (labelEl) {
+            const capTab = tab.charAt(0).toUpperCase() + tab.slice(1);
+            labelEl.innerHTML = `📋 ${capTab} Transfer`;
+        }
+        const areaEl = document.getElementById('textarea-history-io');
+        if (areaEl) areaEl.value = '';
+        
+        renderHistoryTab(tab, false); // false = don't append, clear list
      });
   });
+
+  document.getElementById('btn-load-more-history').addEventListener('click', () => {
+      currentHistoryOffset += HISTORY_PAGE_SIZE;
+      renderHistoryTab(currentHistoryStore, true); // true = append
+  });
+
+  document.getElementById('btn-export-history').addEventListener('click', async () => {
+      try {
+          const records = await HistoryStore.getAllStore(currentHistoryStore);
+          let dataToExport;
+          
+          if (currentHistoryStore === 'saved') {
+              // Keep titles and durations for Saved, drop thumbs
+              dataToExport = records.map(r => ({ id: r.id, title: r.title, durationSec: r.durationSec }));
+          } else {
+              // Ultra-compact: Only IDs for Watched/Dismissed
+              dataToExport = records.map(r => r.id);
+          }
+          
+          const text = JSON.stringify(dataToExport, null, 2);
+          const area = document.getElementById('textarea-history-io');
+          area.value = text;
+          area.select();
+          
+          if (navigator.clipboard) {
+              await navigator.clipboard.writeText(text);
+              alert(`${currentHistoryStore.charAt(0).toUpperCase() + currentHistoryStore.slice(1)} backup copied to clipboard!`);
+          }
+      } catch (e) {
+          console.error('History Export Error:', e);
+          alert('Failed to generate history backup.');
+      }
+  });
+
+  document.getElementById('btn-import-history').addEventListener('click', async () => {
+      const area = document.getElementById('textarea-history-io');
+      const text = area.value.trim();
+      if (!text) {
+          alert('Please paste some backup text into the box first!');
+          return;
+      }
+      
+      try {
+          const data = JSON.parse(text);
+          if (!Array.isArray(data)) {
+              alert('Invalid backup format. Expected a JSON array.');
+              return;
+          }
+          
+          let count = 0;
+          for (const item of data) {
+              let videoObj;
+              if (typeof item === 'string') {
+                  // It's just an ID (Watched/Dismissed)
+                  videoObj = { id: item, timestamp: Date.now() };
+              } else if (item.id) {
+                  // It's a full or partial object (Saved)
+                  videoObj = { ...item, timestamp: Date.now() };
+              }
+              
+              if (videoObj) {
+                  if (currentHistoryStore === 'watched') await HistoryStore.markWatched(videoObj);
+                  else if (currentHistoryStore === 'dismissed') await HistoryStore.markDismissed(videoObj);
+                  else if (currentHistoryStore === 'saved') await HistoryStore.markSaved(videoObj);
+                  count++;
+              }
+          }
+          alert(`Imported ${count} items into ${currentHistoryStore} store!`);
+          currentHistoryOffset = 0;
+          renderHistoryTab(currentHistoryStore, false);
+      } catch (err) {
+          console.error('History Import Error:', err);
+          alert('Failed to import history text. Ensure it is a valid array.');
+      }
+  });
+
 
   document.getElementById('btn-add-bucket').addEventListener('click', () => {
     saveBucketsFromDOM();
@@ -223,28 +317,57 @@ document.addEventListener('DOMContentLoaded', () => {
   QueueDrawer.init(playVideo);
 });
 
-async function renderHistoryTab(storeName) {
+async function renderHistoryTab(storeName, append = false) {
    const container = document.getElementById('history-list-container');
-   container.innerHTML = '<div style="color:var(--text-secondary); text-align:center;">Loading...</div>';
+   const loadMoreBtn = document.getElementById('btn-load-more-history');
    
-   const records = await HistoryStore.getAllStore(storeName);
-   // Sort newest first
-   records.sort((a, b) => b.timestamp - a.timestamp);
+   if (!append) {
+       container.innerHTML = '<div style="color:var(--text-secondary); text-align:center;">Loading...</div>';
+       historyRecordsCache = await HistoryStore.getAllStore(storeName);
+       historyRecordsCache.sort((a, b) => b.timestamp - a.timestamp);
+   }
+   
+   const records = historyRecordsCache;
    
    if (records.length === 0) {
       container.innerHTML = `<div style="color:var(--text-secondary); text-align:center; padding: 20px;">No ${storeName} videos found.</div>`;
+      if (loadMoreBtn) loadMoreBtn.style.display = 'none';
       return;
    }
    
-   container.innerHTML = '';
-   records.forEach(v => {
+   if (!append) container.innerHTML = '';
+   
+   const slice = records.slice(currentHistoryOffset, currentHistoryOffset + HISTORY_PAGE_SIZE);
+   
+   if (slice.length === 0) {
+       if (loadMoreBtn) loadMoreBtn.style.display = 'none';
+       return;
+   }
+   
+   // API Hydration Check: Find IDs that lack titles
+   const missingDetailsIds = slice.filter(v => !v.title).map(v => v.id);
+   
+   let hydratedDetails = [];
+   if (missingDetailsIds.length > 0) {
+       console.log(`[Diagnostic] Hydrating ${missingDetailsIds.length} history items from API...`);
+       try {
+           hydratedDetails = await YouTubeApi.fetchVideoDetails(missingDetailsIds);
+       } catch (e) {
+           console.error('Failed to hydrate history details:', e);
+       }
+   }
+   
+   // Render slice
+   slice.forEach(v => {
+      const detail = hydratedDetails.find(d => d.id === v.id) || v;
+      
       const el = document.createElement('div');
       el.className = 'queue-item';
       
       const dateStr = new Date(v.timestamp).toLocaleDateString();
-      const thumb = v.thumbnail || '';
-      const cTitle = v.channelTitle || 'Unknown Creator';
-      const vTitle = v.title || v.id;
+      const thumb = detail.thumbnail || '';
+      const cTitle = detail.channelTitle || 'Unknown Creator';
+      const vTitle = detail.title || v.id; // Fallback to ID if hydration failed
       
       el.innerHTML = `
         <img src="${thumb}" alt="thumb" class="video-thumb">
@@ -261,18 +384,33 @@ async function renderHistoryTab(storeName) {
       if (storeName === 'saved') {
          el.querySelector('.play-btn').addEventListener('click', () => {
              document.getElementById('btn-close-history').click();
-             playVideo(v, true); // Play immediately
+             playVideo(detail, true); // Play immediately with details
          });
       }
       
       el.querySelector('.del-btn').addEventListener('click', async () => {
          await HistoryStore.removeFromStore(storeName, v.id);
-         renderHistoryTab(storeName); // refresh
+         // Remove from cache too
+         historyRecordsCache = historyRecordsCache.filter(r => r.id !== v.id);
+         el.remove(); // Remove from DOM immediately
+         if (container.children.length === 0) {
+              renderHistoryTab(storeName, false); // reload if empty
+         }
       });
       
       container.appendChild(el);
    });
+   
+   // Handle Load More visibility
+   if (loadMoreBtn) {
+       if (currentHistoryOffset + HISTORY_PAGE_SIZE < records.length) {
+           loadMoreBtn.style.display = 'block';
+       } else {
+           loadMoreBtn.style.display = 'none';
+       }
+   }
 }
+
 
 function renderSettingsBuckets() {
    const container = document.getElementById('buckets-accordion');

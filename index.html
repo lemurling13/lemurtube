@@ -130,8 +130,9 @@
         </div>
 
         <div style="text-align: center; margin-top: 32px; padding-top: 16px; border-top: 1px solid var(--border-color); color: var(--text-secondary); font-size: 0.8rem; font-family: monospace;">
-            LemurTube Curator v1.6.5
+            LemurTube Curator v1.7.0
         </div>
+
 
 
 
@@ -162,12 +163,26 @@
            <button id="tab-watched" class="secondary-btn" style="flex:1;">Watched</button>
            <button id="tab-dismissed" class="secondary-btn" style="flex:1;">Dismissed</button>
         </div>
-        
+
+        <!-- Transfer Portal -->
+        <div style="margin-bottom: 16px; padding: 12px; background: #1a1a1a; border-radius: 8px;">
+            <label id="label-history-io" style="display:block; margin-bottom: 6px; font-size: 0.9em; color: var(--text-secondary);">📋 Saved Transfer</label>
+            <textarea id="textarea-history-io" class="form-input" style="width: 100%; height: 60px; font-family: monospace; font-size: 0.8em; background: #121212; color: #ccc;" placeholder="Dump text here..."></textarea>
+            <div style="display: flex; gap: 12px; margin-top: 8px;">
+                <button id="btn-export-history" class="secondary-btn" style="flex: 1; font-size: 0.8em;">📤 Generate</button>
+                <button id="btn-import-history" class="primary-btn" style="flex: 1; font-size: 0.8em;">📥 Import</button>
+            </div>
+        </div>
+
         <!-- Results Container -->
         <div id="history-list-container" style="display: flex; flex-direction: column; gap: 8px;">
+
            <!-- items injected here -->
         </div>
+
+        <button id="btn-load-more-history" class="secondary-btn" style="width: 100%; margin-top: 12px; display: none;">Load More</button>
       </div>
+
     </section>
   </div>
 
