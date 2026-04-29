@@ -5,17 +5,41 @@ import { YouTubeApi } from '../api/youtube.js';
 export const QueueDrawer = {
   listEl: null,
   playVideoCallback: null,
+  filterState: 'all',
+
+  matchesFilter(video) {
+    if (this.filterState === 'shorts') return video.isShort;
+    if (this.filterState === 'no_shorts') return !video.isShort;
+    return true;
+  },
 
   init(playVideoCallback) {
     this.listEl = document.getElementById('queue-list');
     this.playVideoCallback = playVideoCallback;
 
     document.getElementById('btn-fetch-bottom').addEventListener('click', () => this.fetchVideos(false));
-    document.getElementById('btn-fetch-top').addEventListener('click', () => this.fetchVideos(true));
-    document.getElementById('btn-replace-all').addEventListener('click', () => {
-      QueueEngine.clearQueue();
-      this.fetchVideos(false);
+    
+    const filterBtn = document.getElementById('btn-fetch-top');
+    filterBtn.addEventListener('click', () => {
+        if (this.filterState === 'all') {
+            this.filterState = 'shorts';
+            filterBtn.innerHTML = 'Shorts';
+        } else if (this.filterState === 'shorts') {
+            this.filterState = 'no_shorts';
+            filterBtn.innerHTML = 'No Shorts';
+        } else {
+            this.filterState = 'all';
+            filterBtn.innerHTML = 'All';
+        }
+        this.render();
     });
+
+    const replaceAllBtn = document.getElementById('btn-replace-all');
+    replaceAllBtn.addEventListener('click', () => {
+      QueueEngine.clearQueue();
+      this.fetchVideos(false, replaceAllBtn);
+    });
+
 
     document.querySelectorAll('.btn-timed').forEach(btn => {
       btn.addEventListener('click', (e) => {
@@ -121,6 +145,11 @@ export const QueueDrawer = {
       const el = document.createElement('div');
       el.className = 'queue-item' + (isActive ? ' current-playing' : '') + (video.isTimedBlock ? ' timed-block-item' : '');
       el.style.cursor = 'pointer';
+      
+      if (!this.matchesFilter(video)) {
+          el.style.display = 'none';
+      }
+
 
       const timedTag = video.isTimedBlock ? `<span style="background:var(--primary-accent);color:#fff;padding:2px 4px;font-size:0.7rem;border-radius:2px;margin-right:4px;">⏱️ Timed</span>` : '';
       
@@ -211,7 +240,7 @@ export const QueueDrawer = {
       }
   },
 
-  async fetchVideos(toTop = false) {
+  async fetchVideos(toTop = false, triggeringBtn = null) {
     const activeId = SettingsStore.getActiveBucketId();
     const buckets = SettingsStore.getBuckets();
     const activeBucket = buckets.find(b => b.id === activeId);
@@ -221,10 +250,11 @@ export const QueueDrawer = {
       return;
     }
 
-    const btn = toTop ? document.getElementById('btn-fetch-top') : document.getElementById('btn-fetch-bottom');
+    const btn = triggeringBtn || (toTop ? document.getElementById('btn-fetch-top') : document.getElementById('btn-fetch-bottom'));
     const oldHtml = btn.innerHTML;
     btn.innerHTML = 'Fetching...';
     btn.disabled = true;
+
 
     try {
       // Parallel Map Loop:

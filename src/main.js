@@ -469,28 +469,44 @@ function renderSettingsBuckets() {
 
       el.innerHTML = `
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+          <span class="toggle-icon" style="cursor:pointer; margin-right:8px; font-size:1.2rem;">▼</span>
           <input type="text" class="b-name" data-id="${b.id}" value="${b.name}" style="flex-grow:1; margin-right:8px; font-weight:bold;">
           <button class="icon-btn btn-delete-bucket" style="font-size:0.9rem; color: var(--danger-color);" data-id="${b.id}">Trash Cache</button>
         </div>
         
-        <label>Global Bucket Overrides:</label>
-        <div class="source-config-row" style="margin-bottom: 20px;">
-          <input type="text" class="b-keywords" value="${b.keywords || ''}" placeholder="Global Keywords">
-          <select class="b-shorts">
-            <option value="allow_all" ${b.shortsConstraint === 'allow_all' ? 'selected' : ''}>Allow All Shorts</option>
-            <option value="max_3" ${b.shortsConstraint === 'max_3' ? 'selected' : ''}>Max 3 Shorts</option>
-            <option value="no_shorts" ${b.shortsConstraint === 'no_shorts' ? 'selected' : ''}>No Shorts</option>
-            <option value="only_shorts" ${b.shortsConstraint === 'only_shorts' ? 'selected' : ''}>Only Shorts</option>
-          </select>
-        </div>
+        <div class="bucket-content">
+          <label>Global Bucket Overrides:</label>
+          <div class="source-config-row" style="margin-bottom: 20px;">
+            <input type="text" class="b-keywords" value="${b.keywords || ''}" placeholder="Global Keywords">
+            <select class="b-shorts">
+              <option value="allow_all" ${b.shortsConstraint === 'allow_all' ? 'selected' : ''}>Allow All Shorts</option>
+              <option value="max_3" ${b.shortsConstraint === 'max_3' ? 'selected' : ''}>Max 3 Shorts</option>
+              <option value="no_shorts" ${b.shortsConstraint === 'no_shorts' ? 'selected' : ''}>No Shorts</option>
+              <option value="only_shorts" ${b.shortsConstraint === 'only_shorts' ? 'selected' : ''}>Only Shorts</option>
+            </select>
+          </div>
 
-        <label style="border-bottom:1px solid #333; padding-bottom:4px; display:block;">Sources (${b.sources ? b.sources.length : 0})</label>
-        <div class="sources-container" style="margin-top:8px;">
-          ${sourcesHtml}
+          <label style="border-bottom:1px solid #333; padding-bottom:4px; display:block;">Sources (${b.sources ? b.sources.length : 0})</label>
+          <div class="sources-container" style="margin-top:8px;">
+            ${sourcesHtml}
+          </div>
+          <button class="secondary-btn btn-add-src" style="width:100%; margin-top:12px; padding:8px; font-size:0.9rem;">+ Add Specific Source</button>
         </div>
-        <button class="secondary-btn btn-add-src" style="width:100%; margin-top:12px; padding:8px; font-size:0.9rem;">+ Add Specific Source</button>
       `;
       container.appendChild(el);
+
+      const toggleIcon = el.querySelector('.toggle-icon');
+      const contentDiv = el.querySelector('.bucket-content');
+      toggleIcon.addEventListener('click', () => {
+          if (contentDiv.style.display === 'none') {
+              contentDiv.style.display = 'block';
+              toggleIcon.innerHTML = '▼';
+          } else {
+              contentDiv.style.display = 'none';
+              toggleIcon.innerHTML = '▶';
+          }
+      });
+
       
       const delBtn = el.querySelector('.btn-delete-bucket');
       delBtn.addEventListener('click', () => {
@@ -701,12 +717,21 @@ async function onPlayerStateChange(event) {
        QueueEngine.setQueue(queue);
        QueueDrawer.render();
        
-       // Play the video that shifted up into the activeIdx slot
-       if (SettingsStore.getAutoplay() && activeIdx < queue.length) {
-           playVideo(queue[activeIdx], true);
-       } else if (queue.length === 0) {
-           document.getElementById('youtube-player').innerHTML = ''; // Clear video
-       }
+       // Play the next matching video
+        if (SettingsStore.getAutoplay() && activeIdx < queue.length) {
+            let nextIdx = activeIdx;
+            while (nextIdx < queue.length && !QueueDrawer.matchesFilter(queue[nextIdx])) {
+                nextIdx++;
+            }
+            if (nextIdx < queue.length) {
+                QueueEngine.setActiveIndex(nextIdx);
+                playVideo(queue[nextIdx], true);
+            } else {
+                document.getElementById('youtube-player').innerHTML = ''; // Clear player
+            }
+        } else if (queue.length === 0) {
+            document.getElementById('youtube-player').innerHTML = ''; // Clear video
+        }
     }
   }
 }
