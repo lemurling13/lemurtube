@@ -1,4 +1,5 @@
-const CACHE_NAME = 'lemurtube-v4';
+const CACHE_NAME = 'lemurtube-v5';
+
 
 const APP_URLS = [
   '/',
