@@ -25,12 +25,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  document.addEventListener('visibilitychange', () => {
-     if (document.hidden) {
-        console.log(`[Diagnostic Trace] App shifted to background. Trial forced resume hack.`);
-        if (player && typeof player.playVideo === 'function') player.playVideo();
-     }
-  });
 
   const debugEl = document.getElementById('orientation-debug');
   const handleOrientationUpdate = () => {
