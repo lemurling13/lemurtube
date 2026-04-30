@@ -275,21 +275,35 @@ export const QueueDrawer = {
       const allFetchedData = await Promise.all(fetchPromises);
       let globalEnrichedPool = [];
 
+      let rejectionStats = { recency: 0, keywords: 0, shorts: 0, tooShort: 0, noDetails: 0 };
+
       for (const data of allFetchedData) {
            if (data.rawVideos.length > 0) {
                 const enrichedForSource = await QueueEngine.filterAndEnrichVideos(data.rawVideos, activeBucket, data.src);
                 globalEnrichedPool = globalEnrichedPool.concat(enrichedForSource.map(v => ({...v, sourcePriority: data.src.priority, sourceId: data.src.id})));
            }
       }
-
+      
+      const rej = QueueEngine.lastRejectionStats;
       const stats = allFetchedData.map(d => `${d.src.id.substring(0,5)}..: ${d.rawVideos.length}`).join('<br>');
       
       if (globalEnrichedPool.length === 0) {
-          this.listEl.innerHTML = `<div class="empty-state">Queue is empty.<br>Zero videos survived filters.<br><br><b>Pool Candidates:</b><br>${stats}</div>`;
+          this.listEl.innerHTML = `<div class="empty-state">
+              Queue is empty.<br>
+              Zero videos survived filters.<br><br>
+              <b>Rejection Breakdown:</b><br>
+              - Keywords: ${rej.keywords}<br>
+              - Recency (<14d): ${rej.recency}<br>
+              - Shorts Rule: ${rej.shorts}<br>
+              - Too Short (<30s): ${rej.tooShort}<br>
+              - No API Details: ${rej.noDetails}<br><br>
+              <b>Pool Candidates:</b><br>${stats}
+          </div>`;
           btn.innerHTML = oldHtml;
           btn.disabled = false;
           return;
       }
+
 
       for (let i = globalEnrichedPool.length - 1; i > 0; i--) {
          const j = Math.floor(Math.random() * (i + 1));
