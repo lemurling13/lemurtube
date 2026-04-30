@@ -26,19 +26,19 @@ export const QueueEngine = {
 
     for (const raw of rawVideos) {
         const detail = details.find(d => d.id === raw.id);
-        if (!detail) { console.log(`[Diagnostic] Skipped "${raw.title}": API returned no details (Region locked or deleted)`); continue; }
+        if (!detail) { console.log(`[Diagnostic] Skipped ID "${raw.id}": API returned no details (Region locked or deleted)`); continue; }
 
         if (!sourceConfig?.isRepeatable) {
             const watched = await HistoryStore.isWatched(raw.id);
-            if (watched) { console.log(`[Diagnostic] Skipped "${raw.title}": Already Watched in Local History`); continue; }
+            if (watched) { console.log(`[Diagnostic] Skipped "${detail.title}": Already Watched in Local History`); continue; }
 
             const dismissed = await HistoryStore.isDismissed(raw.id);
-            if (dismissed) { console.log(`[Diagnostic] Skipped "${raw.title}": Already Dismissed in Local History`); continue; }
+            if (dismissed) { console.log(`[Diagnostic] Skipped "${detail.title}": Already Dismissed in Local History`); continue; }
         } else {
-            console.log(`[Diagnostic] History Bypass Active for "${raw.title}" (Repeatable Source)`);
+            console.log(`[Diagnostic] History Bypass Active for "${detail.title}" (Repeatable Source)`);
         }
 
-        if (this.isTooShort(detail.durationSec)) { console.log(`[Diagnostic] Skipped "${raw.title}": Duration too short (${detail.durationSec}s)`); continue; }
+        if (this.isTooShort(detail.durationSec)) { console.log(`[Diagnostic] Skipped "${detail.title}": Duration too short (${detail.durationSec}s)`); continue; }
 
         // 1. Enforce Recency Constraint (only_new)
         const dateToUse = detail.publishedAt || raw.publishedAt;
@@ -46,7 +46,7 @@ export const QueueEngine = {
            const pubDate = new Date(dateToUse).getTime();
            const DAYS_14 = 14 * 24 * 60 * 60 * 1000;
            if (Date.now() - pubDate > DAYS_14) {
-              console.log(`[Diagnostic] Skipped "${raw.title}": Older than 14 days (Recency trigger)`);
+              console.log(`[Diagnostic] Skipped "${detail.title}": Older than 14 days (Recency trigger)`);
               continue; 
            }
         }
@@ -56,15 +56,15 @@ export const QueueEngine = {
         
         // 2. Cascade Shorts Logic
         const sourceShortsRule = sourceConfig?.shortsConstraint || 'mix';
-        if (sourceShortsRule === 'no_shorts' && isSht) { console.log(`[Diagnostic] Skipped "${raw.title}": Blocked by SOURCE No-Shorts rule RegExp`); continue; }
-        if (sourceShortsRule === 'only_shorts' && !isSht) { console.log(`[Diagnostic] Skipped "${raw.title}": Blocked by SOURCE Only-Shorts rule (Is standard video)`); continue; }
+        if (sourceShortsRule === 'no_shorts' && isSht) { console.log(`[Diagnostic] Skipped "${detail.title}": Blocked by SOURCE No-Shorts rule RegExp`); continue; }
+        if (sourceShortsRule === 'only_shorts' && !isSht) { console.log(`[Diagnostic] Skipped "${detail.title}": Blocked by SOURCE Only-Shorts rule (Is standard video)`); continue; }
 
         const bucketShortsRule = bucketConfig.shortsConstraint || 'max_3';
-        if (bucketShortsRule === 'no_shorts' && isSht) { console.log(`[Diagnostic] Skipped "${raw.title}": Blocked by GLOBAL No-Shorts rule`); continue; }
-        if (bucketShortsRule === 'only_shorts' && !isSht) { console.log(`[Diagnostic] Skipped "${raw.title}": Blocked by GLOBAL Only-Shorts rule (Is standard video)`); continue; }
+        if (bucketShortsRule === 'no_shorts' && isSht) { console.log(`[Diagnostic] Skipped "${detail.title}": Blocked by GLOBAL No-Shorts rule`); continue; }
+        if (bucketShortsRule === 'only_shorts' && !isSht) { console.log(`[Diagnostic] Skipped "${detail.title}": Blocked by GLOBAL Only-Shorts rule (Is standard video)`); continue; }
 
         // 3. Keyword Filter Logic
-        const titleLower = raw.title.toLowerCase();
+        const titleLower = detail.title.toLowerCase();
         
         const runKeywordFilter = (kwString) => {
             if (!kwString) return true; // Pass if no keywords
@@ -77,7 +77,8 @@ export const QueueEngine = {
             });
         };
 
-        if (!runKeywordFilter(sourceConfig?.keywords)) { console.log(`[Diagnostic] Skipped "${raw.title}": Failed SOURCE keyword match against -> [${sourceConfig?.keywords}]`); continue; }
+        if (!runKeywordFilter(sourceConfig?.keywords)) { console.log(`[Diagnostic] Skipped "${detail.title}": Failed SOURCE keyword match against -> [${sourceConfig?.keywords}]`); continue; }
+
         if (!runKeywordFilter(bucketConfig.keywords)) { console.log(`[Diagnostic] Skipped "${raw.title}": Failed GLOBAL keyword match against -> [${bucketConfig.keywords}]`); continue; }
 
         validVideos.push({
