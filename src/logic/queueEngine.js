@@ -83,12 +83,11 @@ export const QueueEngine = {
 
 
         validVideos.push({
-            ...raw,
-            durationSec: detail.durationSec,
-            isShort: isSht,
-            thumbnail: raw.thumbnail || `https://img.youtube.com/vi/${raw.id}/hqdefault.jpg`
+            ...detail,
+            isShort: isSht
         });
     }
+
     
     console.log(`[Diagnostic] Surviving videos: ${validVideos.length}`);
     return validVideos;
