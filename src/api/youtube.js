@@ -137,8 +137,10 @@ export const YouTubeApi = {
       channelId: v.snippet.channelId,
       channelTitle: v.snippet.channelTitle,
       publishedAt: v.snippet.publishedAt,
+      thumbnail: v.snippet.thumbnails?.high?.url || v.snippet.thumbnails?.default?.url,
       durationSec: parseDuration(v.contentDetails.duration)
     }));
+
 
   }
 };

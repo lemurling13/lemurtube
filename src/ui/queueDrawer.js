@@ -259,11 +259,16 @@ export const QueueDrawer = {
     try {
       // Pull from local pools instead of API
       const fetchPromises = activeBucket.sources.map(async (src) => {
+          if (!src.id || src.id.trim().length < 5) {
+              console.log(`[Diagnostic] Skipping empty or invalid source ID in fetch: "${src.id}"`);
+              return { src, rawVideos: [] };
+          }
           const pool = await HistoryStore.getPool(src.id);
           // Take top 10 candidates to keep lottery pool balanced
           const candidates = pool.ids.slice(0, 10).map(id => ({ id }));
           return { src, rawVideos: candidates };
       });
+
 
 
       const allFetchedData = await Promise.all(fetchPromises);
@@ -339,11 +344,12 @@ export const QueueDrawer = {
       
     } catch (e) {
       console.error(e);
-      alert('Error fetching videos. Check console.');
+      alert('Error fetching videos: ' + (e.message || e));
     } finally {
       btn.innerHTML = oldHtml;
       btn.disabled = false;
     }
+
   },
 
   async generateTimedStream(targetMinutes) {
