@@ -292,11 +292,13 @@ export const QueueDrawer = {
               Queue is empty.<br>
               Zero videos survived filters.<br><br>
               <b>Rejection Breakdown:</b><br>
+              - In History: ${rej.history}<br>
               - Keywords: ${rej.keywords}<br>
               - Recency (<14d): ${rej.recency}<br>
               - Shorts Rule: ${rej.shorts}<br>
               - Too Short (<30s): ${rej.tooShort}<br>
               - No API Details: ${rej.noDetails}<br><br>
+
               <b>Pool Candidates:</b><br>${stats}
           </div>`;
           btn.innerHTML = oldHtml;

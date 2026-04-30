@@ -4,9 +4,10 @@ import { HistoryStore } from '../db/storage.js';
 export const QueueEngine = {
   queue: [],
   activeIndex: 0,
-  lastRejectionStats: { recency: 0, keywords: 0, shorts: 0, tooShort: 0, noDetails: 0 },
+  lastRejectionStats: { recency: 0, keywords: 0, shorts: 0, tooShort: 0, noDetails: 0, history: 0 },
   
   getActiveIndex() { return this.activeIndex; },
+
 
   setActiveIndex(idx) { this.activeIndex = idx; },
   
@@ -39,11 +40,20 @@ export const QueueEngine = {
 
         if (!sourceConfig?.isRepeatable) {
             const watched = await HistoryStore.isWatched(raw.id);
-            if (watched) { console.log(`[Diagnostic] Skipped "${detail.title}": Already Watched in Local History`); continue; }
+            if (watched) { 
+                console.log(`[Diagnostic] Skipped "${detail.title}": Already Watched in Local History`); 
+                this.lastRejectionStats.history++;
+                continue; 
+            }
 
             const dismissed = await HistoryStore.isDismissed(raw.id);
-            if (dismissed) { console.log(`[Diagnostic] Skipped "${detail.title}": Already Dismissed in Local History`); continue; }
+            if (dismissed) { 
+                console.log(`[Diagnostic] Skipped "${detail.title}": Already Dismissed in Local History`); 
+                this.lastRejectionStats.history++;
+                continue; 
+            }
         } else {
+
             console.log(`[Diagnostic] History Bypass Active for "${detail.title}" (Repeatable Source)`);
         }
 
@@ -52,19 +62,6 @@ export const QueueEngine = {
             this.lastRejectionStats.tooShort++;
             continue; 
         }
-
-        // 1. Enforce Recency Constraint (only_new)
-        const dateToUse = detail.publishedAt || raw.publishedAt;
-        if (sourceConfig?.recency === 'only_new' && dateToUse) {
-           const pubDate = new Date(dateToUse).getTime();
-           const DAYS_14 = 14 * 24 * 60 * 60 * 1000;
-           if (Date.now() - pubDate > DAYS_14) {
-              console.log(`[Diagnostic] Skipped "${detail.title}": Older than 14 days (Recency trigger)`);
-              this.lastRejectionStats.recency++;
-              continue; 
-           }
-        }
-
 
         const isSht = this.isShort(detail.durationSec);
         
@@ -93,38 +90,12 @@ export const QueueEngine = {
             continue; 
         }
 
-        // 3. Keyword Filter Logic
-        const titleLower = (detail.title || '').toLowerCase();
-        
-        const runKeywordFilter = (kwString) => {
-            if (!kwString) return true; // Pass if no keywords
-            const patternGroups = kwString.split(',').map(kw => kw.trim().toLowerCase()).filter(k=>k);
-            if (patternGroups.length === 0) return true;
-            
-            return patternGroups.some(kwGroup => {
-                const requiredWords = kwGroup.split('+').map(w => w.trim());
-                return requiredWords.every(word => titleLower.includes(word));
-            });
-        };
-
-        if (!runKeywordFilter(sourceConfig?.keywords)) { 
-            console.log(`[Diagnostic] Skipped "${detail.title}": Failed SOURCE keyword match against -> [${sourceConfig?.keywords}]`); 
-            this.lastRejectionStats.keywords++;
-            continue; 
-        }
-
-        if (!runKeywordFilter(bucketConfig.keywords)) { 
-            console.log(`[Diagnostic] Skipped "${detail.title}": Failed GLOBAL keyword match against -> [${bucketConfig.keywords}]`); 
-            this.lastRejectionStats.keywords++;
-            continue; 
-        }
-
-
         validVideos.push({
             ...detail,
             isShort: isSht
         });
     }
+
 
 
     

@@ -617,14 +617,51 @@ async function populatePoolCounts() {
                 }
                 
                 const newIds = [];
-                for (const v of rawVideos) {
-                    if (pool.ids.includes(v.id)) continue;
-                    const watched = await HistoryStore.isWatched(v.id);
-                    const dismissed = await HistoryStore.isDismissed(v.id);
-                    if (!watched && !dismissed) {
-                        newIds.push(v.id);
-                    }
+                const videoIds = rawVideos.map(v => v.id);
+                let details = [];
+                
+                if (videoIds.length > 0) {
+                    details = await YouTubeApi.fetchVideoDetails(videoIds);
                 }
+                
+                for (const raw of rawVideos) {
+                    if (pool.ids.includes(raw.id)) continue;
+                    
+                    const watched = await HistoryStore.isWatched(raw.id);
+                    if (watched) continue;
+                    
+                    const dismissed = await HistoryStore.isDismissed(raw.id);
+                    if (dismissed) continue;
+                    
+                    const detail = details.find(d => d.id === raw.id);
+                    if (!detail) continue;
+                    
+                    // 1. Enforce Recency Constraint (<14 days)
+                    const dateToUse = detail.publishedAt || raw.publishedAt;
+                    if (sourceConfig?.recency === 'only_new' && dateToUse) {
+                       const pubDate = new Date(dateToUse).getTime();
+                       const DAYS_14 = 14 * 24 * 60 * 60 * 1000;
+                       if (Date.now() - pubDate > DAYS_14) continue;
+                    }
+                    
+                    // 2. Keyword Filter Logic
+                    const titleLower = (detail.title || '').toLowerCase();
+                    const runKeywordFilter = (kwString) => {
+                        if (!kwString) return true;
+                        const patternGroups = kwString.split(',').map(kw => kw.trim().toLowerCase()).filter(k=>k);
+                        if (patternGroups.length === 0) return true;
+                        return patternGroups.some(kwGroup => {
+                            const requiredWords = kwGroup.split('+').map(w => w.trim());
+                            return requiredWords.every(word => titleLower.includes(word));
+                        });
+                    };
+                    
+                    if (!runKeywordFilter(sourceConfig?.keywords)) continue;
+                    if (!runKeywordFilter(activeBucket?.keywords)) continue;
+                    
+                    newIds.push(raw.id);
+                }
+
                 
                 pool.ids.push(...newIds);
                 pool.nextPageToken = rawVideos.nextPageToken || '';
