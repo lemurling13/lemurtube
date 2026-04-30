@@ -430,7 +430,12 @@ function renderSettingsBuckets() {
                       <input type="text" class="s-id" value="${src.id}" placeholder="UC... or PL..." style="flex-grow:1;">
                       <button class="icon-btn btn-delete-src" data-index="${srcIndex}" style="color:var(--danger-color); font-size:1rem;">X</button>
                    </div>
+                   <div style="display:flex; justify-content:space-between; align-items:center; margin-top:4px; margin-bottom:8px;">
+                      <span class="pool-count-label" data-source-id="${src.id}">Pool: ...</span>
+                      <button class="secondary-btn btn-dig-src" data-source-id="${src.id}" style="padding:2px 8px; font-size:0.8rem;">⛏️ Dig</button>
+                   </div>
                    ${src.metaTitle ? `<div style="display:flex; align-items:center; gap:8px; margin-bottom:8px; margin-top:4px;"><img src="${src.metaThumb}" style="width:24px; height:24px; border-radius:50%;"><span style="font-size:0.85rem; font-weight:600; color:var(--text-secondary);">${src.metaTitle}</span></div>` : ''}
+
                    <div class="source-config-row">
                       <input type="text" class="s-keywords" value="${src.keywords}" placeholder="Keywords (+ for AND)">
                       <select class="s-shorts">
@@ -569,7 +574,83 @@ function renderSettingsBuckets() {
          });
       });
    });
+   
+   populatePoolCounts();
 }
+
+async function populatePoolCounts() {
+    const labels = document.querySelectorAll('.pool-count-label');
+    for (const label of labels) {
+        const sourceId = label.getAttribute('data-source-id');
+        if (sourceId && sourceId.length > 5) {
+            const pool = await HistoryStore.getPool(sourceId);
+            label.innerHTML = `Pool: ${pool.ids.length}`;
+        } else {
+            label.innerHTML = `Pool: 0`;
+        }
+    }
+    
+    const digBtns = document.querySelectorAll('.btn-dig-src');
+    digBtns.forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            const sourceId = e.target.getAttribute('data-source-id');
+            if (!sourceId || sourceId.length <= 5) {
+                alert('Please enter a valid Source ID first.');
+                return;
+            }
+            
+            const oldHtml = e.target.innerHTML;
+            e.target.innerHTML = 'Digging...';
+            e.target.disabled = true;
+            
+            try {
+                const pool = await HistoryStore.getPool(sourceId);
+                const activeBucket = SettingsStore.getBuckets().find(b => b.sources.some(s => s.id === sourceId));
+                const sourceConfig = activeBucket ? activeBucket.sources.find(s => s.id === sourceId) : null;
+                
+                let rawVideos = [];
+                if (sourceId.startsWith('UC') || sourceId.startsWith('UCA')) {
+                    if (sourceConfig && sourceConfig.keywords && sourceConfig.keywords.trim()) {
+                        rawVideos = await YouTubeApi.fetchSearchByChannelId(sourceId, sourceConfig.keywords, 50, pool.nextPageToken);
+                    } else {
+                        let mappedId = sourceId;
+                        if (sourceId.startsWith('UC')) mappedId = 'UU' + sourceId.slice(2);
+                        rawVideos = await YouTubeApi.fetchPlaylistItems(mappedId, 50, pool.nextPageToken);
+                    }
+                } else if (sourceId.startsWith('PL')) {
+                    rawVideos = await YouTubeApi.fetchPlaylistItems(sourceId, 50, pool.nextPageToken);
+                }
+                
+                const newIds = [];
+                for (const v of rawVideos) {
+                    if (pool.ids.includes(v.id)) continue;
+                    const watched = await HistoryStore.isWatched(v.id);
+                    const dismissed = await HistoryStore.isDismissed(v.id);
+                    if (!watched && !dismissed) {
+                        newIds.push(v.id);
+                    }
+                }
+                
+                pool.ids.push(...newIds);
+                pool.nextPageToken = rawVideos.nextPageToken || '';
+                
+                await HistoryStore.savePool(sourceId, pool);
+                alert(`Found ${newIds.length} new videos!`);
+                
+                const labelEl = document.querySelector(`.pool-count-label[data-source-id="${sourceId}"]`);
+                if (labelEl) labelEl.innerHTML = `Pool: ${pool.ids.length}`;
+                
+            } catch (err) {
+                console.error('Dig failed:', err);
+                alert('Failed to dig for videos.');
+            } finally {
+                e.target.innerHTML = oldHtml;
+                e.target.disabled = false;
+            }
+        });
+    });
+}
+
 
 function saveBucketsFromDOM() {
    const container = document.getElementById('buckets-accordion');

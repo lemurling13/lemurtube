@@ -257,33 +257,14 @@ export const QueueDrawer = {
 
 
     try {
-      // Parallel Map Loop:
+      // Pull from local pools instead of API
       const fetchPromises = activeBucket.sources.map(async (src) => {
-         let rawForSource = [];
-         try {
-             if (src.id.startsWith('UC') || src.id.startsWith('UCA')) {
-                 if (src.keywords && src.keywords.trim()) {
-                     const results = await YouTubeApi.fetchSearchByChannelId(src.id, src.keywords);
-                     if (results && results.length > 0) rawForSource = results;
-                     console.log(`[Diagnostic] Search route for ${src.id} yielded ${rawForSource.length} videos`);
-                 } else {
-                     let mappedId = src.id;
-                     if (src.id.startsWith('UC')) {
-                         mappedId = 'UU' + src.id.slice(2);
-                     }
-                     const results = await YouTubeApi.fetchPlaylistItems(mappedId);
-                     if (results && results.length > 0) rawForSource = results;
-                     console.log(`[Diagnostic] Playlist route for ${src.id} yielded ${rawForSource.length} videos`);
-                 }
-             } else if (src.id.startsWith('PL')) {
-                 const results = await YouTubeApi.fetchPlaylistItems(src.id);
-                 if (results && results.length > 0) rawForSource = results;
-             }
-         } catch (e) {
-             console.error(`Error fetching source ${src.id}:`, e);
-         }
-         return { src, rawVideos: rawForSource };
+          const pool = await HistoryStore.getPool(src.id);
+          // Take top 10 candidates to keep lottery pool balanced
+          const candidates = pool.ids.slice(0, 10).map(id => ({ id }));
+          return { src, rawVideos: candidates };
       });
+
 
       const allFetchedData = await Promise.all(fetchPromises);
       let globalEnrichedPool = [];
@@ -333,7 +314,23 @@ export const QueueDrawer = {
          finalInsert.push(bucketsByPri[selectedPri].pop());
       }
       
+      // Remove used IDs from local pools
+      const usedIdsBySource = {};
+      finalInsert.forEach(v => {
+          if (v.sourceId) {
+              if (!usedIdsBySource[v.sourceId]) usedIdsBySource[v.sourceId] = [];
+              usedIdsBySource[v.sourceId].push(v.id);
+          }
+      });
+      
+      for (const sourceId in usedIdsBySource) {
+          const pool = await HistoryStore.getPool(sourceId);
+          pool.ids = pool.ids.filter(id => !usedIdsBySource[sourceId].includes(id));
+          await HistoryStore.savePool(sourceId, pool);
+      }
+      
       QueueEngine.smartInsert(finalInsert, toTop, activeBucket.shortsConstraint);
+
       this.render();
 
       if (QueueEngine.getQueue().length > 0 && document.getElementById('youtube-player').innerHTML === '') {

@@ -35,17 +35,20 @@ async function fetchAPI(endpoint, params) {
 }
 
 export const YouTubeApi = {
-  async fetchSearchByChannelId(channelId, query, maxResults = 50) {
-    const data = await fetchAPI('search', {
+  async fetchSearchByChannelId(channelId, query, maxResults = 50, pageToken = '') {
+    const params = {
       part: 'snippet',
       channelId: channelId,
       q: query,
       type: 'video',
       maxResults: maxResults,
       order: 'date'
-    });
+    };
+    if (pageToken) params.pageToken = pageToken;
+    
+    const data = await fetchAPI('search', params);
 
-    return data.items.map(item => ({
+    const items = data.items.map(item => ({
       id: item.id.videoId,
       title: item.snippet.title,
       channelId: item.snippet.channelId,
@@ -53,6 +56,9 @@ export const YouTubeApi = {
       publishedAt: item.snippet.publishedAt,
       thumbnail: item.snippet.thumbnails?.high?.url || item.snippet.thumbnails?.default?.url
     }));
+    
+    items.nextPageToken = data.nextPageToken;
+    return items;
   },
 
   async fetchUploadsByChannelId(channelId, maxResults = 50) {
@@ -60,14 +66,17 @@ export const YouTubeApi = {
     return this.fetchPlaylistItems(playlistId, maxResults);
   },
   
-  async fetchPlaylistItems(playlistId, maxResults = 50) {
-    const data = await fetchAPI('playlistItems', {
+  async fetchPlaylistItems(playlistId, maxResults = 50, pageToken = '') {
+    const params = {
       part: 'snippet',
       playlistId: playlistId,
       maxResults: maxResults
-    });
+    };
+    if (pageToken) params.pageToken = pageToken;
+
+    const data = await fetchAPI('playlistItems', params);
     
-    return data.items.map(item => ({
+    const items = data.items.map(item => ({
       id: item.snippet.resourceId.videoId,
       title: item.snippet.title,
       channelId: item.snippet.videoOwnerChannelId || '',
@@ -75,7 +84,11 @@ export const YouTubeApi = {
       publishedAt: item.snippet.publishedAt,
       thumbnail: item.snippet.thumbnails?.high?.url || item.snippet.thumbnails?.default?.url
     }));
+    
+    items.nextPageToken = data.nextPageToken;
+    return items;
   },
+
 
   async fetchSourceMetadata(sourceId) {
     if (!sourceId) return null;

@@ -104,7 +104,7 @@ export const SettingsStore = {
 
 export const HistoryStore = {
   dbName: 'LemurTubeHistory',
-  version: 2,
+  version: 3,
   db: null,
 
   async init() {
@@ -131,7 +131,11 @@ export const HistoryStore = {
         if (!db.objectStoreNames.contains('saved')) {
           db.createObjectStore('saved', { keyPath: 'id' });
         }
+        if (!db.objectStoreNames.contains('source_pools')) {
+          db.createObjectStore('source_pools', { keyPath: 'sourceId' });
+        }
       };
+
       
       req.onsuccess = () => {
         clearTimeout(timeout);
@@ -246,6 +250,38 @@ export const HistoryStore = {
       console.log(`[Diagnostic Trace] Physically deleting habit key ${id} from store ${storeName}`);
       const tx = this.db.transaction(storeName, 'readwrite');
       tx.objectStore(storeName).delete(id);
+      tx.oncomplete = () => resolve();
+      tx.onabort = (e) => reject(e.target.error || "Transaction aborted");
+    });
+  },
+
+  async getPool(sourceId) {
+    if (!this.db) await this.init();
+    return new Promise((resolve, reject) => {
+      const tx = this.db.transaction('source_pools', 'readonly');
+      const req = tx.objectStore('source_pools').get(sourceId);
+      req.onsuccess = () => resolve(req.result || { sourceId, ids: [], nextPageToken: '' });
+      req.onerror = (e) => reject(e.target.error || "getPool failed");
+      tx.onabort = (e) => reject(e.target.error || "Transaction aborted");
+    });
+  },
+
+  async savePool(sourceId, data) {
+    if (!this.db) await this.init();
+    return new Promise((resolve, reject) => {
+      const tx = this.db.transaction('source_pools', 'readwrite');
+      tx.objectStore('source_pools').put({ sourceId, ...data });
+      tx.oncomplete = () => resolve();
+      tx.onabort = (e) => reject(e.target.error || "Transaction aborted");
+      tx.onerror = (e) => reject(e.target.error || "Transaction failed");
+    });
+  },
+
+  async clearPool(sourceId) {
+    if (!this.db) await this.init();
+    return new Promise((resolve, reject) => {
+      const tx = this.db.transaction('source_pools', 'readwrite');
+      tx.objectStore('source_pools').delete(sourceId);
       tx.oncomplete = () => resolve();
       tx.onabort = (e) => reject(e.target.error || "Transaction aborted");
     });
