@@ -468,12 +468,12 @@ function renderSettingsBuckets() {
 
       el.innerHTML = `
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-          <span class="toggle-icon" style="cursor:pointer; margin-right:8px; font-size:1.2rem;">▼</span>
+          <span class="toggle-icon" style="cursor:pointer; margin-right:8px; font-size:1.2rem;">▶</span>
           <input type="text" class="b-name" data-id="${b.id}" value="${b.name}" style="flex-grow:1; margin-right:8px; font-weight:bold;">
           <button class="icon-btn btn-delete-bucket" style="font-size:0.9rem; color: var(--danger-color);" data-id="${b.id}">Trash Cache</button>
         </div>
         
-        <div class="bucket-content">
+        <div class="bucket-content" style="display:none;">
           <label>Global Bucket Overrides:</label>
           <div class="source-config-row" style="margin-bottom: 20px;">
             <input type="text" class="b-keywords" value="${b.keywords || ''}" placeholder="Global Keywords">
@@ -493,6 +493,7 @@ function renderSettingsBuckets() {
         </div>
       `;
       container.appendChild(el);
+
 
       const toggleIcon = el.querySelector('.toggle-icon');
       const contentDiv = el.querySelector('.bucket-content');
