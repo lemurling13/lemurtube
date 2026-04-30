@@ -64,7 +64,7 @@ export const QueueEngine = {
         if (bucketShortsRule === 'only_shorts' && !isSht) { console.log(`[Diagnostic] Skipped "${detail.title}": Blocked by GLOBAL Only-Shorts rule (Is standard video)`); continue; }
 
         // 3. Keyword Filter Logic
-        const titleLower = detail.title.toLowerCase();
+        const titleLower = (detail.title || '').toLowerCase();
         
         const runKeywordFilter = (kwString) => {
             if (!kwString) return true; // Pass if no keywords
@@ -79,7 +79,8 @@ export const QueueEngine = {
 
         if (!runKeywordFilter(sourceConfig?.keywords)) { console.log(`[Diagnostic] Skipped "${detail.title}": Failed SOURCE keyword match against -> [${sourceConfig?.keywords}]`); continue; }
 
-        if (!runKeywordFilter(bucketConfig.keywords)) { console.log(`[Diagnostic] Skipped "${raw.title}": Failed GLOBAL keyword match against -> [${bucketConfig.keywords}]`); continue; }
+        if (!runKeywordFilter(bucketConfig.keywords)) { console.log(`[Diagnostic] Skipped "${detail.title}": Failed GLOBAL keyword match against -> [${bucketConfig.keywords}]`); continue; }
+
 
         validVideos.push({
             ...raw,
