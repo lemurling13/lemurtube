@@ -289,36 +289,53 @@ export const QueueDrawer = {
       }
 
       const finalInsert = [];
-      const bucketsByPri = { high: [], medium: [], low: [] };
-
-      const getPoints = p => ({ high: 5, medium: 2, low: 1 }[p] || 1);
+      const sourcesPools = {};
       
+      // Group by source
       globalEnrichedPool.forEach(v => {
-         const p = v.sourcePriority || 'low';
-         bucketsByPri[p].push(v);
+          if (v.sourceId) {
+              if (!sourcesPools[v.sourceId]) sourcesPools[v.sourceId] = [];
+              sourcesPools[v.sourceId].push(v);
+          }
       });
 
-      while (bucketsByPri.high.length > 0 || bucketsByPri.medium.length > 0 || bucketsByPri.low.length > 0) {
-         let totalPoints = 0;
-         if (bucketsByPri.high.length > 0) totalPoints += getPoints('high');
-         if (bucketsByPri.medium.length > 0) totalPoints += getPoints('medium');
-         if (bucketsByPri.low.length > 0) totalPoints += getPoints('low');
+      const activeSourceIds = Object.keys(sourcesPools);
+      const getPoints = p => ({ high: 5, medium: 2, low: 1 }[p] || 1);
 
-         let r = Math.random() * totalPoints;
-         let selectedPri;
+      // Lottery loop: Pick a source, then pop a video!
+      while (activeSourceIds.length > 0) {
+          let totalPoints = 0;
+          activeSourceIds.forEach(id => {
+              const pool = sourcesPools[id];
+              const priority = pool.length > 0 ? pool[0].sourcePriority : 'low';
+              totalPoints += getPoints(priority);
+          });
 
-         if (bucketsByPri.high.length > 0) {
-             r -= getPoints('high');
-             if (r <= 0) selectedPri = 'high';
-         }
-         if (!selectedPri && bucketsByPri.medium.length > 0) {
-             r -= getPoints('medium');
-             if (r <= 0) selectedPri = 'medium';
-         }
-         if (!selectedPri && bucketsByPri.low.length > 0) selectedPri = 'low';
+          let r = Math.random() * totalPoints;
+          let selectedSourceId = null;
 
-         finalInsert.push(bucketsByPri[selectedPri].pop());
+          for (const id of activeSourceIds) {
+              const pool = sourcesPools[id];
+              const priority = pool.length > 0 ? pool[0].sourcePriority : 'low';
+              r -= getPoints(priority);
+              if (r <= 0) {
+                  selectedSourceId = id;
+                  break;
+              }
+          }
+
+          if (selectedSourceId) {
+              const video = sourcesPools[selectedSourceId].pop();
+              finalInsert.push(video);
+              
+              // Remove source if exhausted
+              if (sourcesPools[selectedSourceId].length === 0) {
+                  const idx = activeSourceIds.indexOf(selectedSourceId);
+                  activeSourceIds.splice(idx, 1);
+              }
+          }
       }
+
       
       // Remove used IDs from local pools
       const usedIdsBySource = {};
