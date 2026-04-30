@@ -426,8 +426,12 @@ function renderSettingsBuckets() {
                    </div>
                    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:4px; margin-bottom:8px;">
                       <span class="pool-count-label" data-source-id="${src.id}">Pool: ...</span>
-                      <button class="secondary-btn btn-dig-src" data-source-id="${src.id}" style="padding:2px 8px; font-size:0.8rem;">⛏️ Dig</button>
+                      <div style="display:flex; gap: 6px;">
+                          <button class="secondary-btn btn-reset-pool" data-source-id="${src.id}" style="padding:2px 6px; font-size:0.75rem; border-color: #444; background:transparent; color: #888;">♻️ Reset</button>
+                          <button class="secondary-btn btn-dig-src" data-source-id="${src.id}" style="padding:2px 8px; font-size:0.8rem;">⛏️ Dig</button>
+                      </div>
                    </div>
+
                    ${src.metaTitle ? `<div style="display:flex; align-items:center; gap:8px; margin-bottom:8px; margin-top:4px;"><img src="${src.metaThumb}" style="width:24px; height:24px; border-radius:50%;"><span style="font-size:0.85rem; font-weight:600; color:var(--text-secondary);">${src.metaTitle}</span></div>` : ''}
 
                    <div class="source-config-row">
@@ -665,9 +669,13 @@ async function populatePoolCounts() {
                 
                 pool.ids.push(...newIds);
                 pool.nextPageToken = rawVideos.nextPageToken || '';
+                pool.currentPageIndex = (pool.currentPageIndex || 0) + 1;
+                
+                const totalResults = rawVideos.totalResults || 0;
+                const totalPages = Math.ceil(totalResults / 50) || 1;
                 
                 await HistoryStore.savePool(sourceId, pool);
-                alert(`Found ${newIds.length} new videos!`);
+                alert(`Found ${newIds.length} new vetted videos!\nArchive Progress: Page ${pool.currentPageIndex} of ${totalPages}`);
                 
                 const labelEl = document.querySelector(`.pool-count-label[data-source-id="${sourceId}"]`);
                 if (labelEl) labelEl.innerHTML = `Pool: ${pool.ids.length}`;
@@ -681,7 +689,23 @@ async function populatePoolCounts() {
             }
         });
     });
+
+    const resetBtns = document.querySelectorAll('.btn-reset-pool');
+    resetBtns.forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            const sourceId = e.target.getAttribute('data-source-id');
+            if (!sourceId) return;
+            
+            if (confirm('Clear all videos in this pool and start over?')) {
+                await HistoryStore.clearPool(sourceId);
+                const labelEl = document.querySelector(`.pool-count-label[data-source-id="${sourceId}"]`);
+                if (labelEl) labelEl.innerHTML = `Pool: 0`;
+                alert('Pool cleared. Click Dig to harvest fresh vetted content.');
+            }
+        });
+    });
 }
+
 
 
 function saveBucketsFromDOM() {

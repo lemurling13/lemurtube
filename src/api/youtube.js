@@ -58,8 +58,10 @@ export const YouTubeApi = {
     }));
     
     items.nextPageToken = data.nextPageToken;
+    items.totalResults = data.pageInfo ? data.pageInfo.totalResults : 0;
     return items;
   },
+
 
   async fetchUploadsByChannelId(channelId, maxResults = 50) {
     const playlistId = 'UU' + channelId.substring(2);
@@ -86,8 +88,10 @@ export const YouTubeApi = {
     }));
     
     items.nextPageToken = data.nextPageToken;
+    items.totalResults = data.pageInfo ? data.pageInfo.totalResults : 0;
     return items;
   },
+
 
 
   async fetchSourceMetadata(sourceId) {
