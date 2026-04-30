@@ -264,10 +264,11 @@ export const QueueDrawer = {
               return { src, rawVideos: [] };
           }
           const pool = await HistoryStore.getPool(src.id);
-          // Take top 10 candidates to keep lottery pool balanced
-          const candidates = pool.ids.slice(0, 10).map(id => ({ id }));
+          // Take top 50 candidates to give lottery pool rich variety
+          const candidates = pool.ids.slice(0, 50).map(id => ({ id }));
           return { src, rawVideos: candidates };
       });
+
 
 
 
