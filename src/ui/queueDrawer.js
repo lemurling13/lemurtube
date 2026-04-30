@@ -282,6 +282,10 @@ export const QueueDrawer = {
            }
       }
 
+      const stats = allFetchedData.map(d => `${d.src.id.substring(0,5)}..: ${d.rawVideos.length}`).join('\n');
+      alert(`[Diagnostic Stats]\n\nCandidates pulled from pools:\n${stats}\n\nTotal surviving videos after filters: ${globalEnrichedPool.length}`);
+
+
       // Shuffle entire valid pool to prevent source clumping
       for (let i = globalEnrichedPool.length - 1; i > 0; i--) {
          const j = Math.floor(Math.random() * (i + 1));
