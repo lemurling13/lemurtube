@@ -17,8 +17,6 @@ export const QueueDrawer = {
     this.listEl = document.getElementById('queue-list');
     this.playVideoCallback = playVideoCallback;
 
-    document.getElementById('btn-fetch-bottom').addEventListener('click', () => this.fetchVideos(false));
-    
     const filterBtn = document.getElementById('btn-fetch-top');
     filterBtn.addEventListener('click', () => {
         if (this.filterState === 'all') {
@@ -34,11 +32,47 @@ export const QueueDrawer = {
         this.render();
     });
 
+    this.sortState = 'newest';
+
+    document.getElementById('btn-find-new').addEventListener('click', async (e) => {
+
+
+        const btn = e.target;
+        const oldHtml = btn.innerHTML;
+        btn.innerHTML = 'Finding...';
+        btn.disabled = true;
+        try {
+            await this.findNewVideos();
+        } catch (err) {
+            console.error(err);
+            alert('Find New failed.');
+        } finally {
+            btn.innerHTML = oldHtml;
+            btn.disabled = false;
+        }
+    });
+
+    const sortBtn = document.getElementById('btn-toggle-sort');
+    sortBtn.addEventListener('click', () => {
+        if (this.sortState === 'newest') {
+            this.sortState = 'oldest';
+            sortBtn.innerHTML = 'Oldest';
+        } else if (this.sortState === 'oldest') {
+            this.sortState = 'random';
+            sortBtn.innerHTML = 'Random';
+        } else {
+            this.sortState = 'newest';
+            sortBtn.innerHTML = 'Newest';
+        }
+        this.sortQueue();
+    });
+
     const replaceAllBtn = document.getElementById('btn-replace-all');
     replaceAllBtn.addEventListener('click', () => {
       QueueEngine.clearQueue();
       this.fetchVideos(false, replaceAllBtn);
     });
+
 
 
     document.querySelectorAll('.btn-timed').forEach(btn => {
@@ -392,9 +426,115 @@ export const QueueDrawer = {
       btn.disabled = false;
     }
 
+  async findNewVideos() {
+    const activeId = SettingsStore.getActiveBucketId();
+    const buckets = SettingsStore.getBuckets();
+    const activeBucket = buckets.find(b => b.id === activeId);
+
+    if (!activeBucket || !activeBucket.sources) return;
+
+    let totalNewFound = 0;
+
+    for (const src of activeBucket.sources) {
+        if (!src.id || src.id.trim().length < 5) continue;
+
+        try {
+            let rawVideos = [];
+            if (src.id.startsWith('UC') || src.id.startsWith('UCA')) {
+                if (src.keywords && src.keywords.trim()) {
+                    rawVideos = await YouTubeApi.fetchSearchByChannelId(src.id, src.keywords, 50);
+                } else {
+                    let mappedId = src.id;
+                    if (src.id.startsWith('UC')) mappedId = 'UU' + src.id.slice(2);
+                    rawVideos = await YouTubeApi.fetchPlaylistItems(mappedId, 50);
+                }
+            } else if (src.id.startsWith('PL')) {
+                rawVideos = await YouTubeApi.fetchPlaylistItems(src.id, 50);
+            }
+
+            const pool = await HistoryStore.getPool(src.id);
+            const videoIds = rawVideos.map(v => v.id);
+            let details = [];
+            if (videoIds.length > 0) details = await YouTubeApi.fetchVideoDetails(videoIds);
+
+            const newIds = [];
+            const newVideosForQueue = [];
+
+            for (const raw of rawVideos) {
+                if (pool.ids.includes(raw.id)) continue;
+                const watched = await HistoryStore.isWatched(raw.id);
+                if (watched) continue;
+                const dismissed = await HistoryStore.isDismissed(raw.id);
+                if (dismissed) continue;
+
+                const detail = details.find(d => d.id === raw.id);
+                if (!detail) continue;
+
+                const dateToUse = detail.publishedAt || raw.publishedAt;
+                if (src.recency === 'only_new' && dateToUse) {
+                   const pubDate = new Date(dateToUse).getTime();
+                   if (Date.now() - pubDate > 14 * 24 * 60 * 60 * 1000) continue;
+                }
+
+                const titleLower = (detail.title || '').toLowerCase();
+                const runKeywordFilter = (kwString) => {
+                    if (!kwString) return true;
+                    return kwString.split(',').map(kw => kw.trim().toLowerCase()).filter(k=>k).some(kwGroup => {
+                        return kwGroup.split('+').map(w => w.trim()).every(word => titleLower.includes(word));
+                    });
+                };
+
+                if (!runKeywordFilter(src.keywords)) continue;
+                if (!runKeywordFilter(activeBucket.keywords)) continue;
+
+                newIds.push(raw.id);
+                newVideosForQueue.push({ 
+                    ...detail, 
+                    isShort: (detail.durationSec > 30 && detail.durationSec <= 180), 
+                    sourcePriority: src.priority, 
+                    sourceId: src.id 
+                });
+            }
+
+            if (newIds.length > 0) {
+                pool.ids.push(...newIds);
+                await HistoryStore.savePool(src.id, pool);
+                totalNewFound += newIds.length;
+
+                const labelEl = document.querySelector(`.pool-count-label[data-source-id="${src.id}"]`);
+                if (labelEl) labelEl.innerHTML = `Pool: ${pool.ids.length}`;
+                
+                QueueEngine.smartInsert(newVideosForQueue, false, activeBucket.shortsConstraint);
+            }
+        } catch (e) {
+            console.error(`Find New failed for source ${src.id}:`, e);
+        }
+    }
+
+    if (totalNewFound > 0) {
+        this.sortQueue();
+        alert(`Added ${totalNewFound} new videos to the queue!`);
+    } else {
+        alert('No new uploads found.');
+    }
   },
 
-  async generateTimedStream(targetMinutes) {
+  sortQueue() {
+      const queue = QueueEngine.getQueue();
+      if (this.sortState === 'newest') {
+          queue.sort((a, b) => new Date(b.publishedAt || 0) - new Date(a.publishedAt || 0));
+      } else if (this.sortState === 'oldest') {
+          queue.sort((a, b) => new Date(a.publishedAt || 0) - new Date(b.publishedAt || 0));
+      } else if (this.sortState === 'random') {
+          for (let i = queue.length - 1; i > 0; i--) {
+              const j = Math.floor(Math.random() * (i + 1));
+              [queue[i], queue[j]] = [queue[j], queue[i]];
+          }
+      }
+      QueueEngine.setQueue(queue);
+      this.render();
+  },
+
      const activeId = SettingsStore.getActiveBucketId();
      const buckets = SettingsStore.getBuckets();
      const activeBucket = buckets.find(b => b.id === activeId);

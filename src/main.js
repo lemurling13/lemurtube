@@ -480,14 +480,9 @@ function renderSettingsBuckets() {
         <div class="bucket-content" style="display:none;">
           <label>Global Bucket Overrides:</label>
           <div class="source-config-row" style="margin-bottom: 20px;">
-            <input type="text" class="b-keywords" value="${b.keywords || ''}" placeholder="Global Keywords">
-            <select class="b-shorts">
-              <option value="allow_all" ${b.shortsConstraint === 'allow_all' ? 'selected' : ''}>Allow All Shorts</option>
-              <option value="max_3" ${b.shortsConstraint === 'max_3' ? 'selected' : ''}>Max 3 Shorts</option>
-              <option value="no_shorts" ${b.shortsConstraint === 'no_shorts' ? 'selected' : ''}>No Shorts</option>
-              <option value="only_shorts" ${b.shortsConstraint === 'only_shorts' ? 'selected' : ''}>Only Shorts</option>
-            </select>
+            <input type="text" class="b-keywords" value="${b.keywords || ''}" placeholder="Global Keywords" style="width: 100%;">
           </div>
+
 
           <label style="border-bottom:1px solid #333; padding-bottom:4px; display:block;">Sources (${b.sources ? b.sources.length : 0})</label>
           <div class="sources-container" style="margin-top:8px;">
@@ -736,8 +731,9 @@ function saveBucketsFromDOM() {
          name: ed.querySelector('.b-name').value,
          sources: sources,
          keywords: ed.querySelector('.b-keywords').value,
-         shortsConstraint: ed.querySelector('.b-shorts').value
+         shortsConstraint: 'allow_all'
       });
+
    });
    
    SettingsStore.setBuckets(newBuckets);
