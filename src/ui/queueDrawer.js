@@ -537,7 +537,9 @@ export const QueueDrawer = {
       this.render();
   },
 
+  async generateTimedStream(targetMinutes) {
      const activeId = SettingsStore.getActiveBucketId();
+
      const buckets = SettingsStore.getBuckets();
      const activeBucket = buckets.find(b => b.id === activeId);
      
