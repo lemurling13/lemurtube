@@ -425,8 +425,10 @@ export const QueueDrawer = {
       btn.innerHTML = oldHtml;
       btn.disabled = false;
     }
+  },
 
   async findNewVideos() {
+
     const activeId = SettingsStore.getActiveBucketId();
     const buckets = SettingsStore.getBuckets();
     const activeBucket = buckets.find(b => b.id === activeId);
