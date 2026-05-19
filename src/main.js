@@ -217,15 +217,16 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btn-add-bucket').addEventListener('click', () => {
     saveBucketsFromDOM();
     const buckets = SettingsStore.getBuckets();
+    const newId = `bucket_${Date.now()}`;
     buckets.push({
-      id: `bucket_${Date.now()}`,
+      id: newId,
       name: `New Bucket ${buckets.length + 1}`,
       sources: [],
       keywords: '',
       shortsConstraint: 'max_3'
     });
     SettingsStore.setBuckets(buckets);
-    renderSettingsBuckets();
+    renderSettingsBuckets([newId]);
   });
 
   document.getElementById('btn-save-buckets').addEventListener('click', () => {
@@ -406,8 +407,25 @@ async function renderHistoryTab(storeName, append = false) {
 }
 
 
-function renderSettingsBuckets() {
+function renderSettingsBuckets(explicitOpenIds = null) {
    const container = document.getElementById('buckets-accordion');
+   
+   // Retrieve currently open bucket IDs to keep them open
+   const openBucketIds = new Set();
+   if (container) {
+       container.querySelectorAll('.bucket-editor').forEach(el => {
+           const nameInput = el.querySelector('.b-name');
+           const contentDiv = el.querySelector('.bucket-content');
+           if (nameInput && contentDiv && contentDiv.style.display === 'block') {
+               const id = nameInput.getAttribute('data-id');
+               if (id) openBucketIds.add(id);
+           }
+       });
+   }
+   if (explicitOpenIds) {
+       explicitOpenIds.forEach(id => openBucketIds.add(id));
+   }
+
    container.innerHTML = '';
    const buckets = SettingsStore.getBuckets();
    
@@ -470,14 +488,16 @@ function renderSettingsBuckets() {
           });
       }
 
+      const isExpanded = openBucketIds.has(b.id);
+
       el.innerHTML = `
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-          <span class="toggle-icon" style="cursor:pointer; margin-right:8px; font-size:1.2rem;">▶</span>
+          <span class="toggle-icon" style="cursor:pointer; margin-right:8px; font-size:1.2rem;">${isExpanded ? '▼' : '▶'}</span>
           <input type="text" class="b-name" data-id="${b.id}" value="${b.name}" style="flex-grow:1; margin-right:8px; font-weight:bold;">
           <button class="icon-btn btn-delete-bucket" style="font-size:0.9rem; color: var(--danger-color);" data-id="${b.id}">Trash Cache</button>
         </div>
         
-        <div class="bucket-content" style="display:none;">
+        <div class="bucket-content" style="display:${isExpanded ? 'block' : 'none'};">
           <label>Global Bucket Overrides:</label>
           <div class="source-config-row" style="margin-bottom: 20px;">
             <input type="text" class="b-keywords" value="${b.keywords || ''}" placeholder="Global Keywords" style="width: 100%;">
@@ -602,17 +622,23 @@ async function populatePoolCounts() {
                 const activeBucket = SettingsStore.getBuckets().find(b => b.sources.some(s => s.id === sourceId));
                 const sourceConfig = activeBucket ? activeBucket.sources.find(s => s.id === sourceId) : null;
                 
+                const targetId = await YouTubeApi.resolveChannelId(sourceId);
+                if (!targetId) {
+                    alert('Could not resolve handle or ID.');
+                    return;
+                }
+
                 let rawVideos = [];
-                if (sourceId.startsWith('UC') || sourceId.startsWith('UCA')) {
+                if (targetId.startsWith('UC') || targetId.startsWith('UCA')) {
                     if (sourceConfig && sourceConfig.keywords && sourceConfig.keywords.trim()) {
-                        rawVideos = await YouTubeApi.fetchSearchByChannelId(sourceId, sourceConfig.keywords, 50, pool.nextPageToken);
+                        rawVideos = await YouTubeApi.fetchSearchByChannelId(targetId, sourceConfig.keywords, 50, pool.nextPageToken);
                     } else {
-                        let mappedId = sourceId;
-                        if (sourceId.startsWith('UC')) mappedId = 'UU' + sourceId.slice(2);
+                        let mappedId = targetId;
+                        if (targetId.startsWith('UC')) mappedId = 'UU' + targetId.slice(2);
                         rawVideos = await YouTubeApi.fetchPlaylistItems(mappedId, 50, pool.nextPageToken);
                     }
-                } else if (sourceId.startsWith('PL')) {
-                    rawVideos = await YouTubeApi.fetchPlaylistItems(sourceId, 50, pool.nextPageToken);
+                } else if (targetId.startsWith('PL')) {
+                    rawVideos = await YouTubeApi.fetchPlaylistItems(targetId, 50, pool.nextPageToken);
                 }
                 
                 const newIds = [];
@@ -634,6 +660,12 @@ async function populatePoolCounts() {
                     
                     const detail = details.find(d => d.id === raw.id);
                     if (!detail) continue;
+
+                    if (QueueEngine.isTooShort(detail.durationSec)) {
+                        console.log(`[Diagnostic] Dig skipped "${detail.title}": Duration too short (${detail.durationSec}s). Auto-dismissing.`);
+                        await HistoryStore.markDismissed({ id: raw.id, title: detail.title, durationSec: detail.durationSec, timestamp: Date.now() });
+                        continue;
+                    }
                     
                     // 1. Enforce Recency Constraint (<14 days)
                     const dateToUse = detail.publishedAt || raw.publishedAt;
@@ -643,20 +675,8 @@ async function populatePoolCounts() {
                        if (Date.now() - pubDate > DAYS_14) continue;
                     }
                     
-                    // 2. Keyword Filter Logic
-                    const titleLower = (detail.title || '').toLowerCase();
-                    const runKeywordFilter = (kwString) => {
-                        if (!kwString) return true;
-                        const patternGroups = kwString.split(',').map(kw => kw.trim().toLowerCase()).filter(k=>k);
-                        if (patternGroups.length === 0) return true;
-                        return patternGroups.some(kwGroup => {
-                            const requiredWords = kwGroup.split('+').map(w => w.trim());
-                            return requiredWords.every(word => titleLower.includes(word));
-                        });
-                    };
-                    
-                    if (!runKeywordFilter(sourceConfig?.keywords)) continue;
-                    if (!runKeywordFilter(activeBucket?.keywords)) continue;
+                    if (!QueueEngine.evaluateKeywordString(sourceConfig?.keywords, detail.title)) continue;
+                    if (!QueueEngine.evaluateKeywordString(activeBucket?.keywords, detail.title)) continue;
                     
                     newIds.push(raw.id);
                 }

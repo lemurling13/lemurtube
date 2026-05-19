@@ -70,18 +70,19 @@
           <div class="drawer-actions" style="display:flex; flex-direction:row; gap:8px; overflow-x:auto; white-space:nowrap; align-items:center; padding:12px 16px; border-bottom: 1px solid var(--border-color);">
               <button id="btn-fetch-top" class="action-btn">All</button>
               <button id="btn-find-new" class="action-btn">Find New</button>
-              <button id="btn-toggle-sort" class="action-btn">Newest</button>
+              <button id="btn-toggle-sort" class="action-btn">Newest | 0</button>
               <button id="btn-replace-all" class="action-btn">Swap All</button>
 
-              
               <div style="width:1px; height:20px; background:var(--border-color); margin:0 4px;"></div>
               
-              <span style="color:var(--text-secondary); font-size:0.8rem; font-weight:600; text-transform:uppercase; letter-spacing:0.5px;">Timed:</span>
-              <button class="action-btn btn-timed" data-mins="15">15m</button>
-              <button class="action-btn btn-timed" data-mins="30">30m</button>
-              <button class="action-btn btn-timed" data-mins="45">45m</button>
-              <button class="action-btn btn-timed" data-mins="60">60m</button>
-              <button class="action-btn btn-timed" data-mins="90">90m</button>
+              <select id="select-timed-stream" class="action-btn" style="background:var(--bg-color); color:var(--text-primary); border:1px solid var(--border-color); padding:6px 10px; border-radius:18px; font-size:0.9rem; cursor:pointer;">
+                  <option value="" selected disabled>⏱️ Timed...</option>
+                  <option value="15">15m Stream</option>
+                  <option value="30">30m Stream</option>
+                  <option value="45">45m Stream</option>
+                  <option value="60">60m Stream</option>
+                  <option value="90">90m Stream</option>
+              </select>
           </div>
           <div class="queue-list" id="queue-list">
             <!-- Queue Items populated here -->

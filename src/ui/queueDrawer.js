@@ -56,13 +56,10 @@ export const QueueDrawer = {
     sortBtn.addEventListener('click', () => {
         if (this.sortState === 'newest') {
             this.sortState = 'oldest';
-            sortBtn.innerHTML = 'Oldest';
         } else if (this.sortState === 'oldest') {
             this.sortState = 'random';
-            sortBtn.innerHTML = 'Random';
         } else {
             this.sortState = 'newest';
-            sortBtn.innerHTML = 'Newest';
         }
         this.sortQueue();
     });
@@ -73,14 +70,16 @@ export const QueueDrawer = {
       this.fetchVideos(false, replaceAllBtn);
     });
 
-
-
-    document.querySelectorAll('.btn-timed').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-         const mins = parseInt(e.target.getAttribute('data-mins'), 10);
-         this.generateTimedStream(mins);
+    const selectTimed = document.getElementById('select-timed-stream');
+    if (selectTimed) {
+      selectTimed.addEventListener('change', (e) => {
+         const mins = parseInt(e.target.value, 10);
+         if (!isNaN(mins) && mins > 0) {
+            this.generateTimedStream(mins);
+            e.target.value = "";
+         }
       });
-    });
+    }
 
     const drawer = document.getElementById('queue-drawer');
     const toggleBtn = document.getElementById('btn-toggle-queue');
@@ -163,6 +162,12 @@ export const QueueDrawer = {
     this.listEl.innerHTML = '';
     const queue = QueueEngine.getQueue();
     
+    const sortBtn = document.getElementById('btn-toggle-sort');
+    if (sortBtn) {
+        const stateStr = this.sortState ? this.sortState.charAt(0).toUpperCase() + this.sortState.slice(1) : 'Newest';
+        sortBtn.innerHTML = `${stateStr} | ${queue.length}`;
+    }
+
     // Always persist state to storage when render is called
     SettingsStore.saveQueueState(SettingsStore.getActiveBucketId() || 'default', queue);
     this.renderPreview(queue);
@@ -361,7 +366,7 @@ export const QueueDrawer = {
       const getPoints = p => ({ high: 5, medium: 2, low: 1 }[p] || 1);
 
       // Lottery loop: Pick a source, then pop a video!
-      while (activeSourceIds.length > 0) {
+      while (activeSourceIds.length > 0 && finalInsert.length < 50) {
           let totalPoints = 0;
           activeSourceIds.forEach(id => {
               const pool = sourcesPools[id];
@@ -428,7 +433,6 @@ export const QueueDrawer = {
   },
 
   async findNewVideos() {
-
     const activeId = SettingsStore.getActiveBucketId();
     const buckets = SettingsStore.getBuckets();
     const activeBucket = buckets.find(b => b.id === activeId);
@@ -436,22 +440,26 @@ export const QueueDrawer = {
     if (!activeBucket || !activeBucket.sources) return;
 
     let totalNewFound = 0;
+    let addedToQueueCount = 0;
 
     for (const src of activeBucket.sources) {
         if (!src.id || src.id.trim().length < 5) continue;
 
         try {
+            const targetId = await YouTubeApi.resolveChannelId(src.id);
+            if (!targetId) continue;
+
             let rawVideos = [];
-            if (src.id.startsWith('UC') || src.id.startsWith('UCA')) {
+            if (targetId.startsWith('UC') || targetId.startsWith('UCA')) {
                 if (src.keywords && src.keywords.trim()) {
-                    rawVideos = await YouTubeApi.fetchSearchByChannelId(src.id, src.keywords, 50);
+                    rawVideos = await YouTubeApi.fetchSearchByChannelId(targetId, src.keywords, 50);
                 } else {
-                    let mappedId = src.id;
-                    if (src.id.startsWith('UC')) mappedId = 'UU' + src.id.slice(2);
+                    let mappedId = targetId;
+                    if (targetId.startsWith('UC')) mappedId = 'UU' + targetId.slice(2);
                     rawVideos = await YouTubeApi.fetchPlaylistItems(mappedId, 50);
                 }
-            } else if (src.id.startsWith('PL')) {
-                rawVideos = await YouTubeApi.fetchPlaylistItems(src.id, 50);
+            } else if (targetId.startsWith('PL')) {
+                rawVideos = await YouTubeApi.fetchPlaylistItems(targetId, 50);
             }
 
             const pool = await HistoryStore.getPool(src.id);
@@ -472,30 +480,31 @@ export const QueueDrawer = {
                 const detail = details.find(d => d.id === raw.id);
                 if (!detail) continue;
 
+                if (QueueEngine.isTooShort(detail.durationSec)) {
+                   console.log(`[Diagnostic] FindNew skipped "${detail.title}": Duration too short (${detail.durationSec}s). Auto-dismissing.`);
+                   await HistoryStore.markDismissed({ id: raw.id, title: detail.title, durationSec: detail.durationSec, timestamp: Date.now() });
+                   continue;
+                }
+
                 const dateToUse = detail.publishedAt || raw.publishedAt;
                 if (src.recency === 'only_new' && dateToUse) {
                    const pubDate = new Date(dateToUse).getTime();
                    if (Date.now() - pubDate > 14 * 24 * 60 * 60 * 1000) continue;
                 }
 
-                const titleLower = (detail.title || '').toLowerCase();
-                const runKeywordFilter = (kwString) => {
-                    if (!kwString) return true;
-                    return kwString.split(',').map(kw => kw.trim().toLowerCase()).filter(k=>k).some(kwGroup => {
-                        return kwGroup.split('+').map(w => w.trim()).every(word => titleLower.includes(word));
-                    });
-                };
-
-                if (!runKeywordFilter(src.keywords)) continue;
-                if (!runKeywordFilter(activeBucket.keywords)) continue;
+                if (!QueueEngine.evaluateKeywordString(src.keywords, detail.title)) continue;
+                if (!QueueEngine.evaluateKeywordString(activeBucket.keywords, detail.title)) continue;
 
                 newIds.push(raw.id);
-                newVideosForQueue.push({ 
-                    ...detail, 
-                    isShort: (detail.durationSec > 30 && detail.durationSec <= 180), 
-                    sourcePriority: src.priority, 
-                    sourceId: src.id 
-                });
+                if (addedToQueueCount < 50) {
+                    newVideosForQueue.push({ 
+                        ...detail, 
+                        isShort: (detail.durationSec > 30 && detail.durationSec <= 180), 
+                        sourcePriority: src.priority, 
+                        sourceId: src.id 
+                    });
+                    addedToQueueCount++;
+                }
             }
 
             if (newIds.length > 0) {
@@ -506,7 +515,9 @@ export const QueueDrawer = {
                 const labelEl = document.querySelector(`.pool-count-label[data-source-id="${src.id}"]`);
                 if (labelEl) labelEl.innerHTML = `Pool: ${pool.ids.length}`;
                 
-                QueueEngine.smartInsert(newVideosForQueue, false, activeBucket.shortsConstraint);
+                if (newVideosForQueue.length > 0) {
+                    QueueEngine.smartInsert(newVideosForQueue, false, activeBucket.shortsConstraint);
+                }
             }
         } catch (e) {
             console.error(`Find New failed for source ${src.id}:`, e);
@@ -515,7 +526,7 @@ export const QueueDrawer = {
 
     if (totalNewFound > 0) {
         this.sortQueue();
-        alert(`Added ${totalNewFound} new videos to the queue!`);
+        alert(`Discovered ${totalNewFound} new videos! (Added ${Math.min(totalNewFound, 50)} to active queue, remainder safely cached in offline pools)`);
     } else {
         alert('No new uploads found.');
     }

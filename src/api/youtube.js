@@ -94,18 +94,36 @@ export const YouTubeApi = {
 
 
 
+  async resolveChannelId(sourceId) {
+    if (!sourceId) return null;
+    if (sourceId.startsWith('UC') || sourceId.startsWith('PL')) return sourceId;
+    if (sourceId.startsWith('@')) {
+      try {
+        const data = await fetchAPI('channels', { part: 'id', forHandle: sourceId });
+        if (data.items && data.items.length > 0) {
+          return data.items[0].id;
+        }
+      } catch (e) {
+        console.warn(`Failed to resolve handle ${sourceId}`, e);
+      }
+    }
+    return sourceId;
+  },
+
   async fetchSourceMetadata(sourceId) {
     if (!sourceId) return null;
     try {
-      if (sourceId.startsWith('UC')) {
-        const data = await fetchAPI('channels', { part: 'snippet', id: sourceId });
+      const resolvedId = await this.resolveChannelId(sourceId);
+      if (!resolvedId) return null;
+      if (resolvedId.startsWith('UC')) {
+        const data = await fetchAPI('channels', { part: 'snippet', id: resolvedId });
         if (!data.items || data.items.length === 0) return null;
         return {
-          title: data.items[0].snippet.title,
+          title: data.items[0].snippet.title + (sourceId.startsWith('@') ? ` (${sourceId})` : ''),
           thumbnail: data.items[0].snippet.thumbnails?.default?.url
         };
-      } else if (sourceId.startsWith('PL')) {
-        const data = await fetchAPI('playlists', { part: 'snippet', id: sourceId });
+      } else if (resolvedId.startsWith('PL')) {
+        const data = await fetchAPI('playlists', { part: 'snippet', id: resolvedId });
         if (!data.items || data.items.length === 0) return null;
         return {
           title: data.items[0].snippet.title,

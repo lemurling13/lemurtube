@@ -19,6 +19,47 @@ export const QueueEngine = {
     return durationSec <= 30;
   },
 
+  evaluateKeywordString(kwString, targetTitle) {
+    if (!kwString || !kwString.trim()) return true;
+    const titleLower = (targetTitle || '').toLowerCase();
+    
+    let expr = kwString.toLowerCase();
+    let loopLimit = 50;
+    while (expr.includes('(') && expr.includes(')') && loopLimit-- > 0) {
+      const closeIdx = expr.indexOf(')');
+      const openIdx = expr.lastIndexOf('(', closeIdx);
+      if (openIdx !== -1) {
+        const innerContent = expr.slice(openIdx + 1, closeIdx);
+        const res = this.evaluateSimpleKeywordGroup(innerContent, titleLower);
+        expr = expr.slice(0, openIdx) + (res ? '__true__' : '__false__') + expr.slice(closeIdx + 1);
+      } else {
+        break;
+      }
+    }
+    
+    return this.evaluateSimpleKeywordGroup(expr, titleLower);
+  },
+
+  evaluateSimpleKeywordGroup(kwString, titleLower) {
+    if (!kwString || !kwString.trim()) return true;
+    const patternGroups = kwString.split(',').map(kw => kw.trim()).filter(k => k);
+    if (patternGroups.length === 0) return true;
+    
+    return patternGroups.some(kwGroup => {
+      const terms = kwGroup.split('+').map(w => w.trim()).filter(w => w);
+      return terms.every(term => {
+        if (term === '__true__') return true;
+        if (term === '__false__') return false;
+        if (term.startsWith('-')) {
+          const excludeWord = term.slice(1).trim();
+          if (!excludeWord) return true;
+          return !titleLower.includes(excludeWord);
+        }
+        return titleLower.includes(term);
+      });
+    });
+  },
+
   async filterAndEnrichVideos(rawVideos, bucketConfig, sourceConfig) {
     const videoIds = rawVideos.map(v => v.id);
     const details = await YouTubeApi.fetchVideoDetails(videoIds);
@@ -58,9 +99,16 @@ export const QueueEngine = {
         }
 
         if (this.isTooShort(detail.durationSec)) { 
-            console.log(`[Diagnostic] Skipped "${detail.title}": Duration too short (${detail.durationSec}s)`); 
+            console.log(`[Diagnostic] Skipped "${detail.title}": Duration too short (${detail.durationSec}s). Auto-dismissing.`); 
             this.lastRejectionStats.tooShort++;
+            await HistoryStore.markDismissed({ id: raw.id, title: detail.title, durationSec: detail.durationSec, timestamp: Date.now() });
             continue; 
+        }
+
+        if (!this.evaluateKeywordString(sourceConfig?.keywords, detail.title) || !this.evaluateKeywordString(bucketConfig.keywords, detail.title)) {
+            console.log(`[Diagnostic] Skipped "${detail.title}": Blocked by keyword rules`);
+            this.lastRejectionStats.keywords++;
+            continue;
         }
 
         const isSht = this.isShort(detail.durationSec);
