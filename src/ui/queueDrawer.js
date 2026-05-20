@@ -192,11 +192,22 @@ export const QueueDrawer = {
 
       const timedTag = video.isTimedBlock ? `<span style="background:var(--primary-accent);color:#fff;padding:2px 4px;font-size:0.7rem;border-radius:2px;margin-right:4px;">⏱️ Timed</span>` : '';
       
+      let dateStr = '';
+      if (video.publishedAt) {
+          const d = new Date(video.publishedAt);
+          if (!isNaN(d)) {
+              const yyyy = d.getFullYear();
+              const mm = String(d.getMonth() + 1).padStart(2, '0');
+              const dd = String(d.getDate()).padStart(2, '0');
+              dateStr = ` • ${yyyy}-${mm}-${dd}`;
+          }
+      }
+      
       el.innerHTML = `
         <img src="${video.thumbnail}" alt="thumb" class="video-thumb">
         <div class="video-info">
           <div class="video-title">${timedTag}${video.title}</div>
-          <div class="video-meta">${video.channelTitle} • ${video.isShort ? 'Short' : this.formatTime(video.durationSec)}</div>
+          <div class="video-meta">${video.channelTitle}${dateStr} • ${video.isShort ? 'Short' : this.formatTime(video.durationSec)}</div>
         </div>
         ${isActive ? '<div class="playing-indicator"><svg viewBox="0 0 24 24" style="width:24px;height:24px;fill:var(--primary-accent);"><path d="M8 5v14l11-7z"/></svg></div>' : ''}
         <div style="display:flex; flex-direction:column; gap:4px; align-items:flex-end;">
@@ -303,6 +314,15 @@ export const QueueDrawer = {
               return { src, rawVideos: [] };
           }
           const pool = await HistoryStore.getPool(src.id);
+          const cleanIds = [];
+          for (const id of pool.ids) {
+              if (await HistoryStore.isWatched(id) || await HistoryStore.isDismissed(id)) continue;
+              cleanIds.push(id);
+          }
+          if (cleanIds.length !== pool.ids.length) {
+              pool.ids = cleanIds;
+              await HistoryStore.savePool(src.id, pool);
+          }
           // Take top 50 candidates to give lottery pool rich variety
           const candidates = pool.ids.slice(0, 50).map(id => ({ id }));
           return { src, rawVideos: candidates };
