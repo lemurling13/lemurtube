@@ -26,21 +26,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
 
-  const handleOrientationUpdate = () => {
-      const isLandscape = window.innerWidth > window.innerHeight;
-      if (isLandscape) {
-          document.body.classList.add('app-fullscreen');
-      } else {
-          document.body.classList.remove('app-fullscreen');
-      }
-  };
-  
-  window.addEventListener('resize', handleOrientationUpdate);
-  window.addEventListener('orientationchange', handleOrientationUpdate);
-  if (screen.orientation) {
-      screen.orientation.addEventListener('change', handleOrientationUpdate);
-  }
-  handleOrientationUpdate();
+  // Responsive sizing handled purely via CSS media queries
 
 
 
