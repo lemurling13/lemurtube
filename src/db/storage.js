@@ -106,10 +106,17 @@ export const HistoryStore = {
   dbName: 'LemurTubeHistory',
   version: 3,
   db: null,
+  initPromise: null,
+  cachedWatched: null,
+  cachedDismissed: null,
 
   async init() {
-    return new Promise((resolve, reject) => {
+    if (this.db) return Promise.resolve();
+    if (this.initPromise) return this.initPromise;
+
+    this.initPromise = new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
+        this.initPromise = null;
         reject(new Error("IndexedDB connection timed out. Close other tabs running LemurTube."));
       }, 3000);
 
@@ -117,6 +124,7 @@ export const HistoryStore = {
       
       req.onblocked = () => {
         clearTimeout(timeout);
+        this.initPromise = null;
         reject(new Error("IndexedDB is blocked by another tab. Please close duplicates!"));
       };
 
@@ -136,155 +144,223 @@ export const HistoryStore = {
         }
       };
 
-      
       req.onsuccess = () => {
         clearTimeout(timeout);
         this.db = req.result;
         
-        // Handle unexpected disconnects cleanly
         this.db.onversionchange = () => {
            this.db.close();
+           this.db = null;
+           this.initPromise = null;
         };
+
+        try {
+          const wTx = this.db.transaction('watched', 'readonly');
+          const wReq = wTx.objectStore('watched').getAllKeys();
+          wReq.onsuccess = () => { this.cachedWatched = new Set(wReq.result || []); };
+          
+          const dTx = this.db.transaction('dismissed', 'readonly');
+          const dReq = dTx.objectStore('dismissed').getAllKeys();
+          dReq.onsuccess = () => { this.cachedDismissed = new Set(dReq.result || []); };
+        } catch (err) {
+          console.error("Cache preload error:", err);
+        }
         
         resolve();
       };
       
       req.onerror = () => {
         clearTimeout(timeout);
+        this.initPromise = null;
         reject(req.error);
       };
     });
+
+    return this.initPromise;
   },
 
   async markWatched(video) {
+    if (!video) return;
+    const item = typeof video === 'string' ? { id: video, timestamp: Date.now() } : video;
+    if (!item.id) return;
     if (!this.db) await this.init();
+    if (this.cachedWatched) this.cachedWatched.add(item.id);
     return new Promise((resolve, reject) => {
-      const tx = this.db.transaction('watched', 'readwrite');
-      tx.objectStore('watched').put({ 
-         id: video.id, 
-         title: video.title, 
-         channelTitle: video.channelTitle, 
-         thumbnail: video.thumbnail, 
-         durationSec: video.durationSec,
-         timestamp: Date.now() 
-      });
-      tx.oncomplete = () => resolve();
-      tx.onabort = (e) => reject(e.target.error || "Transaction aborted");
+      try {
+        const tx = this.db.transaction('watched', 'readwrite');
+        tx.objectStore('watched').put({ 
+           id: item.id, 
+           title: item.title || '', 
+           channelTitle: item.channelTitle || '', 
+           thumbnail: item.thumbnail || '', 
+           durationSec: item.durationSec || 0,
+           timestamp: item.timestamp || Date.now() 
+        });
+        tx.oncomplete = () => resolve();
+        tx.onerror = (e) => reject(e.target.error || "Transaction failed");
+      } catch (e) {
+        reject(e);
+      }
     });
-
   },
 
   async isWatched(id) {
+    if (!id) return false;
     if (!this.db) await this.init();
-    return new Promise((resolve, reject) => {
-      const tx = this.db.transaction('watched', 'readonly');
-      const req = tx.objectStore('watched').get(id);
-      req.onsuccess = () => resolve(!!req.result);
-      tx.onabort = (e) => reject(e.target.error || "Transaction aborted");
-      tx.onerror = (e) => reject(e.target.error || "Transaction failed");
+    if (this.cachedWatched && this.cachedWatched.has(id)) return true;
+    return new Promise((resolve) => {
+      try {
+        const tx = this.db.transaction('watched', 'readonly');
+        const req = tx.objectStore('watched').get(id);
+        req.onsuccess = () => {
+          if (req.result && this.cachedWatched) this.cachedWatched.add(id);
+          resolve(!!req.result);
+        };
+        req.onerror = () => resolve(false);
+      } catch (e) {
+        resolve(false);
+      }
     });
   },
 
   async markDismissed(video) {
+    if (!video) return;
+    const item = typeof video === 'string' ? { id: video, timestamp: Date.now() } : video;
+    if (!item.id) return;
     if (!this.db) await this.init();
+    if (this.cachedDismissed) this.cachedDismissed.add(item.id);
     return new Promise((resolve, reject) => {
-      const tx = this.db.transaction('dismissed', 'readwrite');
-      tx.objectStore('dismissed').put({ 
-         id: video.id, 
-         title: video.title, 
-         channelTitle: video.channelTitle, 
-         thumbnail: video.thumbnail, 
-         durationSec: video.durationSec,
-         timestamp: Date.now() 
-      });
-      tx.oncomplete = () => resolve();
-      tx.onabort = (e) => reject(e.target.error || "Transaction aborted");
-      tx.onerror = (e) => reject(e.target.error || "Transaction failed");
+      try {
+        const tx = this.db.transaction('dismissed', 'readwrite');
+        tx.objectStore('dismissed').put({ 
+           id: item.id, 
+           title: item.title || '', 
+           channelTitle: item.channelTitle || '', 
+           thumbnail: item.thumbnail || '', 
+           durationSec: item.durationSec || 0,
+           timestamp: item.timestamp || Date.now() 
+        });
+        tx.oncomplete = () => resolve();
+        tx.onerror = (e) => reject(e.target.error || "Transaction failed");
+      } catch (e) {
+        reject(e);
+      }
     });
   },
 
   async isDismissed(id) {
+    if (!id) return false;
     if (!this.db) await this.init();
-    return new Promise((resolve, reject) => {
-      const tx = this.db.transaction('dismissed', 'readonly');
-      const req = tx.objectStore('dismissed').get(id);
-      req.onsuccess = () => resolve(!!req.result);
-      tx.onabort = (e) => reject(e.target.error || "Transaction aborted");
-      tx.onerror = (e) => reject(e.target.error || "Transaction failed");
+    if (this.cachedDismissed && this.cachedDismissed.has(id)) return true;
+    return new Promise((resolve) => {
+      try {
+        const tx = this.db.transaction('dismissed', 'readonly');
+        const req = tx.objectStore('dismissed').get(id);
+        req.onsuccess = () => {
+          if (req.result && this.cachedDismissed) this.cachedDismissed.add(id);
+          resolve(!!req.result);
+        };
+        req.onerror = () => resolve(false);
+      } catch (e) {
+        resolve(false);
+      }
     });
   },
 
   async markSaved(video) {
+    if (!video) return;
+    const item = typeof video === 'string' ? { id: video, timestamp: Date.now() } : video;
+    if (!item.id) return;
     if (!this.db) await this.init();
     return new Promise((resolve, reject) => {
-      const tx = this.db.transaction('saved', 'readwrite');
-      tx.objectStore('saved').put({ 
-         id: video.id, 
-         title: video.title, 
-         channelTitle: video.channelTitle, 
-         thumbnail: video.thumbnail, 
-         durationSec: video.durationSec,
-         timestamp: Date.now() 
-      });
-      tx.oncomplete = () => resolve();
-      tx.onabort = (e) => reject(e.target.error || "Transaction aborted");
+      try {
+        const tx = this.db.transaction('saved', 'readwrite');
+        tx.objectStore('saved').put({ 
+           id: item.id, 
+           title: item.title || '', 
+           channelTitle: item.channelTitle || '', 
+           thumbnail: item.thumbnail || '', 
+           durationSec: item.durationSec || 0,
+           timestamp: item.timestamp || Date.now() 
+        });
+        tx.oncomplete = () => resolve();
+        tx.onerror = (e) => reject(e.target.error || "Transaction failed");
+      } catch (e) {
+        reject(e);
+      }
     });
-
   },
 
   async getAllStore(storeName) {
     if (!this.db) await this.init();
     return new Promise((resolve, reject) => {
-      const tx = this.db.transaction(storeName, 'readonly');
-      const req = tx.objectStore(storeName).getAll();
-      req.onsuccess = () => resolve(req.result || []);
-      req.onerror = (e) => reject(e.target.error || "getAllStore failed");
-      tx.onabort = (e) => reject(e.target.error || "Transaction aborted");
+      try {
+        const tx = this.db.transaction(storeName, 'readonly');
+        const req = tx.objectStore(storeName).getAll();
+        req.onsuccess = () => resolve(req.result || []);
+        req.onerror = (e) => reject(e.target.error || "getAllStore failed");
+      } catch (e) {
+        reject(e);
+      }
     });
   },
 
-
   async removeFromStore(storeName, id) {
     if (!this.db) await this.init();
+    if (storeName === 'watched' && this.cachedWatched) this.cachedWatched.delete(id);
+    if (storeName === 'dismissed' && this.cachedDismissed) this.cachedDismissed.delete(id);
     return new Promise((resolve, reject) => {
-      console.log(`[Diagnostic Trace] Physically deleting habit key ${id} from store ${storeName}`);
-      const tx = this.db.transaction(storeName, 'readwrite');
-      tx.objectStore(storeName).delete(id);
-      tx.oncomplete = () => resolve();
-      tx.onabort = (e) => reject(e.target.error || "Transaction aborted");
+      try {
+        console.log(`[Diagnostic Trace] Physically deleting habit key ${id} from store ${storeName}`);
+        const tx = this.db.transaction(storeName, 'readwrite');
+        tx.objectStore(storeName).delete(id);
+        tx.oncomplete = () => resolve();
+        tx.onerror = (e) => reject(e.target.error || "Transaction failed");
+      } catch (e) {
+        reject(e);
+      }
     });
   },
 
   async getPool(sourceId) {
     if (!this.db) await this.init();
     return new Promise((resolve, reject) => {
-      const tx = this.db.transaction('source_pools', 'readonly');
-      const req = tx.objectStore('source_pools').get(sourceId);
-      req.onsuccess = () => resolve(req.result || { sourceId, ids: [], nextPageToken: '' });
-      req.onerror = (e) => reject(e.target.error || "getPool failed");
-      tx.onabort = (e) => reject(e.target.error || "Transaction aborted");
+      try {
+        const tx = this.db.transaction('source_pools', 'readonly');
+        const req = tx.objectStore('source_pools').get(sourceId);
+        req.onsuccess = () => resolve(req.result || { sourceId, ids: [], nextPageToken: '' });
+        req.onerror = (e) => reject(e.target.error || "getPool failed");
+      } catch (e) {
+        reject(e);
+      }
     });
   },
 
   async savePool(sourceId, data) {
     if (!this.db) await this.init();
     return new Promise((resolve, reject) => {
-      const tx = this.db.transaction('source_pools', 'readwrite');
-      tx.objectStore('source_pools').put({ sourceId, ...data });
-      tx.oncomplete = () => resolve();
-      tx.onabort = (e) => reject(e.target.error || "Transaction aborted");
-      tx.onerror = (e) => reject(e.target.error || "Transaction failed");
+      try {
+        const tx = this.db.transaction('source_pools', 'readwrite');
+        tx.objectStore('source_pools').put({ sourceId, ...data });
+        tx.oncomplete = () => resolve();
+        tx.onerror = (e) => reject(e.target.error || "Transaction failed");
+      } catch (e) {
+        reject(e);
+      }
     });
   },
 
   async clearPool(sourceId) {
     if (!this.db) await this.init();
     return new Promise((resolve, reject) => {
-      const tx = this.db.transaction('source_pools', 'readwrite');
-      tx.objectStore('source_pools').delete(sourceId);
-      tx.oncomplete = () => resolve();
-      tx.onabort = (e) => reject(e.target.error || "Transaction aborted");
+      try {
+        const tx = this.db.transaction('source_pools', 'readwrite');
+        tx.objectStore('source_pools').delete(sourceId);
+        tx.oncomplete = () => resolve();
+        tx.onerror = (e) => reject(e.target.error || "Transaction failed");
+      } catch (e) {
+        reject(e);
+      }
     });
   }
-
 };
