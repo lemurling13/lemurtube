@@ -249,6 +249,7 @@ document.addEventListener('DOMContentLoaded', () => {
               buckets: SettingsStore.getBuckets(),
               activeBucket: SettingsStore.getActiveBucketId(),
               autoplay: SettingsStore.getAutoplay(),
+              apiKey: SettingsStore.getYoutubeApiKey(),
               history: {
                   saved: await HistoryStore.getAllStore('saved'),
                   watched: await HistoryStore.getAllStore('watched'),
@@ -285,6 +286,7 @@ document.addEventListener('DOMContentLoaded', () => {
           if (data.buckets) SettingsStore.setBuckets(data.buckets);
           if (data.activeBucket) SettingsStore.setActiveBucketId(data.activeBucket);
           if (typeof data.autoplay !== 'undefined') SettingsStore.setAutoplay(data.autoplay);
+          if (data.apiKey) SettingsStore.setYoutubeApiKey(data.apiKey);
           
           if (data.history) {
               if (data.history.watched) {
