@@ -19,13 +19,13 @@
     <main id="player-view" class="view active">
       <header class="app-top-bar" style="display:flex; justify-content:space-between; align-items:center; padding: 12px 16px; background-color: var(--surface-color); border-bottom: 1px solid var(--border-color); z-index:100;">
         <div style="display:flex; align-items:center; flex:1;">
-            <div style="width: 38px; height: 38px; overflow: hidden; border-radius: 50%; margin-right: 12px; display:flex; align-items:center; justify-content:center; box-shadow: 0 0 6px rgba(187,134,252,0.3);">
+            <div id="btn-toggle-shelves-menu" style="width: 38px; height: 38px; overflow: hidden; border-radius: 50%; margin-right: 12px; display:flex; align-items:center; justify-content:center; box-shadow: 0 0 6px rgba(187,134,252,0.3); cursor:pointer;" title="Open Shelves Menu">
                <img src="./assets/icon-512.png" style="width: 100%; height: 100%; object-fit: cover; transform: scale(1.25);" alt="Lemur Logo">
             </div>
             <select id="bucket-selector" class="bucket-selector" style="background:var(--bg-color); color:var(--text-primary); border:1px solid var(--border-color); padding: 8px; border-radius:8px; font-size:1rem; flex:1; max-width: 80%;"></select>
         </div>
         <div style="display:flex; align-items:center;">
-          <a id="btn-escape-hatch" class="app-icon-btn" href="https://www.youtube.com" target="_blank" style="display:none;" title="Open currently playing video in YouTube (Clears Bot check!)">
+          <a id="btn-escape-hatch" class="app-icon-btn" href="https://www.youtube.com" target="_blank" style="display:none;" title="Open current video in YouTube app to Like or subscribe">
               <svg viewBox="0 0 24 24"><path d="M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z" /></svg>
           </a>
           <button id="btn-open-history" class="app-icon-btn" title="History">
@@ -59,30 +59,30 @@
                  <!-- Skip Next SVG -->
                  <svg viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z" /></svg>
              </button>
-             <button id="btn-toggle-queue" class="queue-header-btn toggle-collapse-btn">
-                 <!-- Chevron Down SVG -->
-                 <svg viewBox="0 0 24 24"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z" /></svg>
-             </button>
           </div>
         </div>
 
         <div id="queue-drawer-content">
           <div class="drawer-actions" style="display:flex; flex-direction:row; gap:8px; overflow-x:auto; white-space:nowrap; align-items:center; padding:12px 16px; border-bottom: 1px solid var(--border-color);">
-              <button id="btn-fetch-top" class="action-btn">All</button>
-              <button id="btn-find-new" class="action-btn">Find New</button>
               <button id="btn-toggle-sort" class="action-btn">Newest | 0</button>
-              <button id="btn-replace-all" class="action-btn">Swap All</button>
-
-              <div style="width:1px; height:20px; background:var(--border-color); margin:0 4px;"></div>
-              
-              <select id="select-timed-stream" class="action-btn" style="background:var(--bg-color); color:var(--text-primary); border:1px solid var(--border-color); padding:6px 10px; border-radius:18px; font-size:0.9rem; cursor:pointer;">
-                  <option value="" selected disabled>⏱️ Timed...</option>
-                  <option value="15">15m Stream</option>
-                  <option value="30">30m Stream</option>
-                  <option value="45">45m Stream</option>
-                  <option value="60">60m Stream</option>
-                  <option value="90">90m Stream</option>
+              <button id="btn-replace-all" class="action-btn icon-only-btn" title="Swap All">
+                  <svg viewBox="0 0 24 24"><path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm-6 8c0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3c-3.31 0-6-2.69-6-6z"/></svg>
+              </button>
+              <button id="btn-fetch-top" class="action-btn">Length: All</button>
+              <select id="select-channel-filter" class="action-btn" style="background:var(--bg-color); color:var(--text-primary); border:1px solid var(--border-color); padding:6px 10px; border-radius:18px; font-size:0.85rem; cursor:pointer;">
+                  <option value="all" selected>Channels: All</option>
               </select>
+              <div style="position:relative; display:flex; align-items:center; justify-content:center;">
+                  <select id="select-timed-stream" class="action-btn icon-only-btn" style="appearance:none; -webkit-appearance:none; width:36px; height:36px; padding:0; border:none; border-radius:18px; background:var(--surface-hover); cursor:pointer;" title="Timed Stream">
+                      <option value="" selected disabled></option>
+                      <option value="15">15m Stream</option>
+                      <option value="30">30m Stream</option>
+                      <option value="45">45m Stream</option>
+                      <option value="60">60m Stream</option>
+                      <option value="90">90m Stream</option>
+                  </select>
+                  <svg viewBox="0 0 24 24" style="pointer-events:none; position:absolute; width:20px; height:20px; fill:var(--text-primary);"><path d="M15 1H9v2h6V1zm-4 13h2V8h-2v6zm8.03-6.61l1.42-1.42c-.43-.51-.9-.99-1.41-1.41l-1.42 1.42C16.07 4.74 14.12 4 12 4c-4.97 0-9 4.03-9 9s4.02 9 9 9 9-4.03 9-9c0-2.12-.74-4.07-1.97-5.61zM12 20c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/></svg>
+              </div>
           </div>
           <div class="queue-list" id="queue-list">
             <!-- Queue Items populated here -->
@@ -99,20 +99,8 @@
       </div>
       
       <div class="settings-content">
-        <h3>Buckets Manager</h3>
-        <button id="btn-save-buckets" class="primary-btn" style="width: 100%; margin-top: 10px; margin-bottom: 12px;">Save All Buckets</button>
-
-
-        <p class="help-text">Define up to 8 contexts below. Sources can be a mix of Channel IDs (UC..) and Playlist IDs (PL..).</p>
-        <div id="buckets-accordion" class="buckets-accordion"></div>
-        
-        <button id="btn-add-bucket" class="secondary-btn" style="width: 100%; margin-top:12px; border: 1px dashed var(--border-color); background: transparent;">➕ Add New Bucket</button>
-
-
-        <h3 style="margin-top: 32px; border-bottom: 1px solid #333; padding-bottom: 8px;">Data Management</h3>
-
-        <div style="margin-top: 16px; border-top: 1px dashed #333; padding-top: 16px; margin-bottom: 32px;">
-
+        <h3 style="border-bottom: 1px solid #333; padding-bottom: 8px;">Data Management</h3>
+        <div style="margin-top: 16px; margin-bottom: 32px;">
             <label style="display:block; margin-bottom: 6px; font-size: 0.9em; color: var(--text-secondary);">📋 Clipboard Transfer (Sync Fallback)</label>
             <textarea id="textarea-backup-io" class="form-input" style="width: 100%; height: 80px; font-family: monospace; font-size: 0.8em; background: #1a1a1a; color: #ccc;" placeholder="Dump text here to copy... or paste text here to import."></textarea>
             <div style="display: flex; gap: 12px; margin-top: 12px;">
@@ -133,15 +121,62 @@
         </div>
 
         <div style="text-align: center; margin-top: 32px; padding-top: 16px; border-top: 1px solid var(--border-color); color: var(--text-secondary); font-size: 0.8rem; font-family: monospace;">
-            LemurTube Curator v1.9.4
+            LemurTube Curator v3.0
         </div>
-
-
-
-
-
       </div>
+    </section>
 
+    <!-- Shelves Menu Side Drawer -->
+    <aside id="shelves-menu-drawer" class="side-drawer collapsed">
+        <div class="side-drawer-header" style="display:flex; align-items:center; justify-content:space-between; padding:16px; border-bottom:1px solid var(--border-color);">
+            <div style="display:flex; align-items:center;">
+                <div style="width: 28px; height: 28px; overflow: hidden; border-radius: 50%; margin-right: 12px; display:flex; align-items:center; justify-content:center;">
+                   <img src="./assets/icon-512.png" style="width: 100%; height: 100%; object-fit: cover; transform: scale(1.25);" alt="Lemur Logo">
+                </div>
+                <h2 style="margin:0; font-size:1.2rem;">Shelves</h2>
+            </div>
+            <button id="btn-close-shelves-menu" class="icon-btn" aria-label="Close">❌</button>
+        </div>
+        <div id="shelves-menu-list" style="padding:16px; display:flex; flex-direction:column; gap:12px; overflow-y:auto; flex:1;">
+            <!-- Active shelves populated here -->
+        </div>
+        <div style="padding:16px; border-top:1px solid var(--border-color);">
+            <button id="btn-create-shelf" class="secondary-btn" style="width:100%; border: 1px dashed var(--border-color); background: transparent;">➕ Create New Shelf</button>
+        </div>
+    </aside>
+    <div id="side-drawer-backdrop" class="drawer-backdrop hidden"></div>
+
+    <!-- Dedicated Shelf Source Modal -->
+    <section id="shelf-editor-modal" class="view hidden" style="z-index:300;">
+        <div class="settings-header">
+            <h2 id="modal-shelf-title">Edit Shelf Sources</h2>
+            <button id="btn-close-shelf-editor" class="icon-btn" aria-label="Close">❌</button>
+        </div>
+        <div class="settings-content">
+            <div class="form-group">
+                <label for="input-shelf-name">Shelf Name</label>
+                <input type="text" id="input-shelf-name" class="form-input" style="width:100%;">
+            </div>
+            <div class="form-group" style="margin-top:16px;">
+                <label for="input-shelf-keywords">Keywords Required (comma-separated)</label>
+                <input type="text" id="input-shelf-keywords" class="form-input" style="width:100%;" placeholder="e.g. news, interview, tutorial">
+            </div>
+            <div class="form-group" style="margin-top:16px;">
+                <label for="select-shelf-shorts">Shorts Strategy</label>
+                <select id="select-shelf-shorts" class="form-input" style="width:100%; background:var(--bg-color); color:var(--text-primary);">
+                    <option value="max_3">No more than 3 Shorts</option>
+                    <option value="none">No Shorts allowed</option>
+                    <option value="any">Unlimited Shorts</option>
+                </select>
+            </div>
+            <h3 style="margin-top:24px; border-bottom:1px solid var(--border-color); padding-bottom:8px;">YouTube Channels / Playlists</h3>
+            <p class="help-text">Add your source IDs (channel starting with UC or playlist starting with PL).</p>
+            <div id="shelf-editor-sources" style="display:flex; flex-direction:column; gap:8px; margin-top:12px;"></div>
+            <button id="btn-add-shelf-source" class="secondary-btn" style="width:100%; margin-top:12px;">➕ Add Source ID</button>
+            
+            <button id="btn-save-shelf-modal" class="primary-btn" style="width:100%; margin-top:32px;">💾 Save Shelf Configuration</button>
+            <button id="btn-delete-shelf" class="secondary-btn" style="width:100%; margin-top:12px; color:#ff5252; border-color:#ff5252; background:transparent;">🗑️ Delete Shelf</button>
+        </div>
     </section>
 
   <!-- History View -->

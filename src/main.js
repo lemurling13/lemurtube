@@ -74,8 +74,6 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Populate API Key from storage
     document.getElementById('input-youtube-api-key').value = SettingsStore.getYoutubeApiKey();
-    
-    renderSettingsBuckets(); // Re-render in case of changes
   });
 
 
@@ -189,25 +187,33 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
 
-  document.getElementById('btn-add-bucket').addEventListener('click', () => {
-    saveBucketsFromDOM();
-    const buckets = SettingsStore.getBuckets();
-    const newId = `bucket_${Date.now()}`;
-    buckets.push({
-      id: newId,
-      name: `New Bucket ${buckets.length + 1}`,
-      sources: [],
-      keywords: '',
-      shortsConstraint: 'max_3'
-    });
-    SettingsStore.setBuckets(buckets);
-    renderSettingsBuckets([newId]);
-  });
+  const shelvesDrawer = document.getElementById('shelves-menu-drawer');
+  const drawerBackdrop = document.getElementById('side-drawer-backdrop');
+  const toggleMenu = () => {
+      shelvesDrawer.classList.toggle('collapsed');
+      drawerBackdrop.classList.toggle('hidden');
+      if (!shelvesDrawer.classList.contains('collapsed')) {
+          renderShelvesMenu();
+      }
+  };
 
-  document.getElementById('btn-save-buckets').addEventListener('click', () => {
-    saveBucketsFromDOM();
-    populateBucketSelector();
-    alert('Buckets configuration saved successfully.');
+  document.getElementById('btn-toggle-shelves-menu').addEventListener('click', toggleMenu);
+  document.getElementById('btn-close-shelves-menu').addEventListener('click', toggleMenu);
+  drawerBackdrop.addEventListener('click', toggleMenu);
+
+  document.getElementById('btn-create-shelf').addEventListener('click', () => {
+      const buckets = SettingsStore.getBuckets();
+      const newId = `bucket_${Date.now()}`;
+      buckets.push({
+          id: newId,
+          name: `New Shelf ${buckets.length + 1}`,
+          sources: [],
+          keywords: '',
+          shortsConstraint: 'max_3'
+      });
+      SettingsStore.setBuckets(buckets);
+      renderShelvesMenu();
+      populateBucketSelector();
   });
 
   document.getElementById('btn-save-api-key').addEventListener('click', () => {
@@ -283,7 +289,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
 
-  renderSettingsBuckets();
+  renderShelvesMenu();
   populateBucketSelector();
 
   QueueDrawer.init(playVideo);
@@ -380,223 +386,230 @@ async function renderHistoryTab(storeName, append = false) {
        } else {
            loadMoreBtn.style.display = 'none';
        }
-   }
-}
+let currentlyEditingBucketId = null;
 
-
-function renderSettingsBuckets(explicitOpenIds = null) {
-   const container = document.getElementById('buckets-accordion');
-   
-   // Retrieve currently open bucket IDs to keep them open
-   const openBucketIds = new Set();
-   if (container) {
-       container.querySelectorAll('.bucket-editor').forEach(el => {
-           const nameInput = el.querySelector('.b-name');
-           const contentDiv = el.querySelector('.bucket-content');
-           if (nameInput && contentDiv && contentDiv.style.display === 'block') {
-               const id = nameInput.getAttribute('data-id');
-               if (id) openBucketIds.add(id);
-           }
-       });
-   }
-   if (explicitOpenIds) {
-       explicitOpenIds.forEach(id => openBucketIds.add(id));
-   }
-
-   container.innerHTML = '';
-   const buckets = SettingsStore.getBuckets();
-   
-   buckets.forEach((b, i) => {
-      const el = document.createElement('div');
-      el.className = 'bucket-editor';
-      
-      let sourcesHtml = '';
-      if (b.sources) {
-          b.sources.forEach((src, srcIndex) => {
-              sourcesHtml += `
-                <div class="source-editor" data-index="${srcIndex}" data-meta-title="${src.metaTitle || ''}" data-meta-thumb="${src.metaThumb || ''}">
-                   <div style="display:flex; justify-content:space-between; gap:8px;">
-                      <input type="text" class="s-id" value="${src.id}" placeholder="UC... or PL..." style="flex-grow:1;">
-                      <button class="icon-btn btn-delete-src" data-index="${srcIndex}" style="color:var(--danger-color); font-size:1rem;">X</button>
-                   </div>
-                   <div style="display:flex; justify-content:space-between; align-items:center; margin-top:4px; margin-bottom:8px;">
-                      <span class="pool-count-label" data-source-id="${src.id}">Pool: ...</span>
-                      <div style="display:flex; gap: 6px;">
-                          <button class="secondary-btn btn-reset-pool" data-source-id="${src.id}" style="padding:2px 6px; font-size:0.75rem; border-color: #444; background:transparent; color: #888;">♻️ Reset</button>
-                          <button class="secondary-btn btn-dig-src" data-source-id="${src.id}" style="padding:2px 8px; font-size:0.8rem;">⛏️ Dig</button>
-                      </div>
-                   </div>
-
-                   ${src.metaTitle ? `<div style="display:flex; align-items:center; gap:8px; margin-bottom:8px; margin-top:4px;"><img src="${src.metaThumb}" style="width:24px; height:24px; border-radius:50%;"><span style="font-size:0.85rem; font-weight:600; color:var(--text-secondary);">${src.metaTitle}</span></div>` : ''}
-
-                   <div class="source-config-row">
-                      <input type="text" class="s-keywords" value="${src.keywords}" placeholder="Keywords (+ for AND)">
-                      <select class="s-shorts">
-                        <option value="mix" ${src.shortsConstraint === 'mix' ? 'selected' : ''}>Mix</option>
-                        <option value="no_shorts" ${src.shortsConstraint === 'no_shorts' ? 'selected' : ''}>No Shorts</option>
-                        <option value="only_shorts" ${src.shortsConstraint === 'only_shorts' ? 'selected' : ''}>Only Shorts</option>
-                      </select>
-                   </div>
-                   <div class="source-config-row">
-                      <select class="s-recency">
-                        <option value="all" ${src.recency === 'all' ? 'selected' : ''}>All Time</option>
-                        <option value="only_new" ${src.recency === 'only_new' ? 'selected' : ''}>Only New (<14 days)</option>
-                      </select>
-                      <select class="s-priority">
-                        <option value="high" ${src.priority === 'high' ? 'selected' : ''}>High Pri</option>
-                        <option value="medium" ${src.priority === 'medium' ? 'selected' : ''}>Med Pri</option>
-                        <option value="low" ${src.priority === 'low' ? 'selected' : ''}>Fallback Pri</option>
-                      </select>
-                   </div>
-                   <div style="margin-top:6px; font-size:0.85rem; color:var(--text-secondary); display:flex; flex-direction:column; gap:6px;">
-                      <label><input type="checkbox" class="s-repeatable" ${src.isRepeatable ? 'checked' : ''}> Repeatable (Ignores Watch History)</label>
-                      <div style="display:flex; align-items:center; gap:8px;">
-                          <label>Force Play:</label>
-                          <select class="s-force-type" style="padding:2px; font-size:0.8rem; background:var(--bg-color); color:var(--text-color); border:1px solid #333;">
-                             <option value="none" ${src.forcePlayType === 'none' || !src.forcePlayType ? 'selected' : ''}>None</option>
-                             <option value="videos" ${src.forcePlayType === 'videos' ? 'selected' : ''}>Every X Videos</option>
-                             <option value="minutes" ${src.forcePlayType === 'minutes' ? 'selected' : ''}>Every X Minutes</option>
-                          </select>
-                          <input type="number" class="s-force-interval" value="${src.forcePlayInterval || ''}" placeholder="X" style="width:50px; padding:2px; font-size:0.8rem; background:var(--bg-color); color:var(--text-color); border:1px solid #333;" min="1" onchange="if(this.value<1) this.value=1;">
-                      </div>
-                   </div>
-                </div>
-              `;
-          });
-      }
-
-      const isExpanded = openBucketIds.has(b.id);
-
-      el.innerHTML = `
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-          <span class="toggle-icon" style="cursor:pointer; margin-right:8px; font-size:1.2rem;">${isExpanded ? '▼' : '▶'}</span>
-          <input type="text" class="b-name" data-id="${b.id}" value="${b.name}" style="flex-grow:1; margin-right:8px; font-weight:bold;">
-          <button class="icon-btn btn-delete-bucket" style="font-size:0.9rem; color: var(--danger-color);" data-id="${b.id}">Trash Cache</button>
-        </div>
+function renderShelvesMenu() {
+    const listEl = document.getElementById('shelves-menu-list');
+    if (!listEl) return;
+    listEl.innerHTML = '';
+    
+    const buckets = SettingsStore.getBuckets();
+    
+    buckets.forEach(b => {
+        const itemEl = document.createElement('div');
+        itemEl.style.cssText = 'background: var(--bg-color); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 8px;';
         
-        <div class="bucket-content" style="display:${isExpanded ? 'block' : 'none'};">
-          <label>Global Bucket Overrides:</label>
-          <div class="source-config-row" style="margin-bottom: 20px;">
-            <input type="text" class="b-keywords" value="${b.keywords || ''}" placeholder="Global Keywords" style="width: 100%;">
-          </div>
-
-
-          <label style="border-bottom:1px solid #333; padding-bottom:4px; display:block;">Sources (${b.sources ? b.sources.length : 0})</label>
-          <div class="sources-container" style="margin-top:8px;">
-            ${sourcesHtml}
-          </div>
-          <button class="secondary-btn btn-add-src" style="width:100%; margin-top:12px; padding:8px; font-size:0.9rem;">+ Add Specific Source</button>
-        </div>
-      `;
-      container.appendChild(el);
-
-
-      const toggleIcon = el.querySelector('.toggle-icon');
-      const contentDiv = el.querySelector('.bucket-content');
-      toggleIcon.addEventListener('click', () => {
-          if (contentDiv.style.display === 'none') {
-              contentDiv.style.display = 'block';
-              toggleIcon.innerHTML = '▼';
-          } else {
-              contentDiv.style.display = 'none';
-              toggleIcon.innerHTML = '▶';
-          }
-      });
-
-      
-      const delBtn = el.querySelector('.btn-delete-bucket');
-      delBtn.addEventListener('click', () => {
-         if(confirm(`Delete ${b.name}?`)) {
-            saveBucketsFromDOM();
-            let current = SettingsStore.getBuckets();
-            current = current.filter(cb => cb.id !== b.id);
-            if (current.length === 0) {
-               current.push({ id:'bucket_1', name:'Default Bucket', sources:[], keywords:'', shortsConstraint:'max_3' });
+        const nameHeader = document.createElement('div');
+        nameHeader.style.cssText = 'display: flex; justify-content: space-between; align-items: center;';
+        nameHeader.innerHTML = `<h4 style="margin:0; font-size:1rem;">${b.name}</h4><span class="pool-badge" data-bucket-id="${b.id}" style="font-size:0.8rem; color:var(--text-secondary);">Pool: ...</span>`;
+        
+        const actionRow = document.createElement('div');
+        actionRow.style.cssText = 'display: flex; gap: 8px; margin-top: 4px;';
+        
+        const editBtn = document.createElement('button');
+        editBtn.className = 'secondary-btn';
+        editBtn.style.cssText = 'flex: 1; font-size: 0.8rem; padding: 6px;';
+        editBtn.textContent = '⚙️ Configure';
+        editBtn.onclick = () => {
+            document.getElementById('btn-close-shelves-menu').click();
+            openShelfEditorModal(b.id);
+        };
+        
+        const findNewBtn = document.createElement('button');
+        findNewBtn.className = 'primary-btn';
+        findNewBtn.style.cssText = 'flex: 1; font-size: 0.8rem; padding: 6px;';
+        findNewBtn.textContent = '🔍 Find New';
+        findNewBtn.onclick = async (e) => {
+            const btn = e.target;
+            const origText = btn.textContent;
+            btn.textContent = 'Searching...';
+            btn.disabled = true;
+            try {
+                await QueueDrawer.findNewVideos(b.id);
+                populateShelvesMenuPools();
+            } catch (err) {
+                console.error(err);
+                alert('Find New failed.');
+            } finally {
+                btn.textContent = origText;
+                btn.disabled = false;
             }
-            SettingsStore.setBuckets(current);
-            renderSettingsBuckets();
-            populateBucketSelector();
-         }
-      });
-
-      const addSrcBtn = el.querySelector('.btn-add-src');
-      addSrcBtn.addEventListener('click', () => {
-          saveBucketsFromDOM(); 
-          const current = SettingsStore.getBuckets();
-          const target = current.find(cb => cb.id === b.id);
-          target.sources.push({ id:'', keywords:'', shortsConstraint:'mix', recency:'all', priority:'medium' });
-          SettingsStore.setBuckets(current);
-          renderSettingsBuckets();
-      });
-
-      const delSrcBtns = el.querySelectorAll('.btn-delete-src');
-      delSrcBtns.forEach(btn => {
-         btn.addEventListener('click', (e) => {
-             const idx = parseInt(e.target.getAttribute('data-index'), 10);
-             if (confirm('Remove this source?')) {
-                 saveBucketsFromDOM();
-                 const current = SettingsStore.getBuckets();
-                 const target = current.find(cb => cb.id === b.id);
-                 target.sources.splice(idx, 1);
-                 SettingsStore.setBuckets(current);
-                 renderSettingsBuckets();
-             }
-         });
-      });
-
-      const sIdInputs = el.querySelectorAll('.s-id');
-      sIdInputs.forEach((input, idx) => {
-         input.addEventListener('change', async (e) => {
-             const newId = e.target.value.trim();
-             if (newId.length > 5) {
-                 const meta = await YouTubeApi.fetchSourceMetadata(newId);
-                 if (meta) {
-                     saveBucketsFromDOM();
-                     const current = SettingsStore.getBuckets();
-                     const target = current.find(cb => cb.id === b.id);
-                     if (target && target.sources[idx]) {
-                         target.sources[idx].metaTitle = meta.title;
-                         target.sources[idx].metaThumb = meta.thumbnail;
-                         SettingsStore.setBuckets(current);
-                         renderSettingsBuckets();
-                     }
-                 }
-             }
-         });
-      });
-   });
-   
-   populatePoolCounts();
+        };
+        
+        actionRow.appendChild(editBtn);
+        actionRow.appendChild(findNewBtn);
+        itemEl.appendChild(nameHeader);
+        itemEl.appendChild(actionRow);
+        listEl.appendChild(itemEl);
+    });
+    
+    populateShelvesMenuPools();
 }
 
-async function populatePoolCounts() {
-    const labels = document.querySelectorAll('.pool-count-label');
-    for (const label of labels) {
-        const sourceId = label.getAttribute('data-source-id');
-        if (sourceId && sourceId.length > 5) {
-            const pool = await HistoryStore.getPool(sourceId);
-            label.innerHTML = `Pool: ${pool.ids.length}`;
+async function populateShelvesMenuPools() {
+    const badges = document.querySelectorAll('.pool-badge');
+    const buckets = SettingsStore.getBuckets();
+    for (const badge of badges) {
+        const bId = badge.getAttribute('data-bucket-id');
+        const bucket = buckets.find(b => b.id === bId);
+        if (bucket && bucket.sources) {
+            let total = 0;
+            for (const s of bucket.sources) {
+                if (s.id && s.id.length > 5) {
+                    const pool = await HistoryStore.getPool(s.id);
+                    total += pool.ids ? pool.ids.length : 0;
+                }
+            }
+            badge.textContent = `Sources: ${bucket.sources.length} | Pool: ${total}`;
         } else {
-            label.innerHTML = `Pool: 0`;
+            badge.textContent = `Sources: 0 | Pool: 0`;
         }
     }
+}
+
+function openShelfEditorModal(bucketId) {
+    currentlyEditingBucketId = bucketId;
+    const viewsEl = document.querySelectorAll('.view.active');
+    viewsEl.forEach(v => {
+        v.classList.remove('active');
+        v.classList.add('hidden');
+    });
+    const modal = document.getElementById('shelf-editor-modal');
+    modal.classList.remove('hidden');
+    modal.classList.add('active');
     
-    const digBtns = document.querySelectorAll('.btn-dig-src');
+    const buckets = SettingsStore.getBuckets();
+    const bucket = buckets.find(b => b.id === bucketId);
+    if (!bucket) return;
+    
+    document.getElementById('input-shelf-name').value = bucket.name || '';
+    document.getElementById('input-shelf-keywords').value = bucket.keywords || '';
+    document.getElementById('select-shelf-shorts').value = bucket.shortsConstraint || 'max_3';
+    
+    renderShelfEditorSources();
+}
+
+function renderShelfEditorSources() {
+    const container = document.getElementById('shelf-editor-sources');
+    container.innerHTML = '';
+    const buckets = SettingsStore.getBuckets();
+    const bucket = buckets.find(b => b.id === currentlyEditingBucketId);
+    if (!bucket || !bucket.sources) return;
+    
+    bucket.sources.forEach((src, srcIndex) => {
+        const el = document.createElement('div');
+        el.className = 'source-editor';
+        el.setAttribute('data-index', srcIndex);
+        el.setAttribute('data-meta-title', src.metaTitle || '');
+        el.setAttribute('data-meta-thumb', src.metaThumb || '');
+        
+        el.innerHTML = `
+            <div style="display:flex; justify-content:space-between; gap:8px;">
+                <input type="text" class="s-id" value="${src.id || ''}" placeholder="UC... or PL..." style="flex-grow:1;">
+                <button class="icon-btn btn-delete-src" data-index="${srcIndex}" style="color:var(--danger-color); font-size:1rem;">X</button>
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:4px; margin-bottom:8px;">
+                <span class="pool-count-label" data-source-id="${src.id || ''}">Pool: ...</span>
+                <div style="display:flex; gap: 6px;">
+                    <button class="secondary-btn btn-reset-pool" data-source-id="${src.id || ''}" style="padding:2px 6px; font-size:0.75rem; border-color:#444; background:transparent; color:#888;">♻️ Reset</button>
+                    <button class="secondary-btn btn-dig-src" data-source-id="${src.id || ''}" style="padding:2px 8px; font-size:0.8rem;">⛏️ Dig</button>
+                </div>
+            </div>
+
+            ${src.metaTitle ? `<div style="display:flex; align-items:center; gap:8px; margin-bottom:8px; margin-top:4px;"><img src="${src.metaThumb}" style="width:24px; height:24px; border-radius:50%;"><span style="font-size:0.85rem; font-weight:600; color:var(--text-secondary);">${src.metaTitle}</span></div>` : ''}
+
+            <div class="source-config-row">
+                <input type="text" class="s-keywords" value="${src.keywords || ''}" placeholder="Keywords (+ for AND)">
+                <select class="s-shorts">
+                    <option value="mix" ${src.shortsConstraint === 'mix' ? 'selected' : ''}>Mix</option>
+                    <option value="no_shorts" ${src.shortsConstraint === 'no_shorts' ? 'selected' : ''}>No Shorts</option>
+                    <option value="only_shorts" ${src.shortsConstraint === 'only_shorts' ? 'selected' : ''}>Only Shorts</option>
+                </select>
+            </div>
+            <div class="source-config-row">
+                <select class="s-recency">
+                    <option value="all" ${src.recency === 'all' ? 'selected' : ''}>All Time</option>
+                    <option value="only_new" ${src.recency === 'only_new' ? 'selected' : ''}>Only New (&lt;14 days)</option>
+                </select>
+                <select class="s-priority">
+                    <option value="high" ${src.priority === 'high' ? 'selected' : ''}>High Pri</option>
+                    <option value="medium" ${src.priority === 'medium' ? 'selected' : ''}>Med Pri</option>
+                    <option value="low" ${src.priority === 'low' ? 'selected' : ''}>Fallback Pri</option>
+                </select>
+            </div>
+            <div style="margin-top:6px; font-size:0.85rem; color:var(--text-secondary); display:flex; flex-direction:column; gap:6px;">
+                <label><input type="checkbox" class="s-repeatable" ${src.isRepeatable ? 'checked' : ''}> Repeatable (Ignores Watch History)</label>
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <label>Force Play:</label>
+                    <select class="s-force-type" style="padding:2px; font-size:0.8rem; background:var(--bg-color); color:var(--text-color); border:1px solid #333;">
+                        <option value="none" ${src.forcePlayType === 'none' || !src.forcePlayType ? 'selected' : ''}>None</option>
+                        <option value="videos" ${src.forcePlayType === 'videos' ? 'selected' : ''}>Every X Videos</option>
+                        <option value="minutes" ${src.forcePlayType === 'minutes' ? 'selected' : ''}>Every X Minutes</option>
+                    </select>
+                    <input type="number" class="s-force-interval" value="${src.forcePlayInterval || ''}" placeholder="X" style="width:50px; padding:2px; font-size:0.8rem; background:var(--bg-color); color:var(--text-color); border:1px solid #333;" min="1" onchange="if(this.value<1) this.value=1;">
+                </div>
+            </div>
+        `;
+        container.appendChild(el);
+    });
+    
+    bindSourceConfigEvents();
+}
+
+async function bindSourceConfigEvents() {
+    const container = document.getElementById('shelf-editor-sources');
+    if (!container) return;
+    
+    const sIdInputs = container.querySelectorAll('.s-id');
+    sIdInputs.forEach((input, idx) => {
+        input.addEventListener('change', async (e) => {
+            const newId = e.target.value.trim();
+            if (newId.length > 5) {
+                const meta = await YouTubeApi.fetchSourceMetadata(newId);
+                if (meta) {
+                    saveModalStateToMemory();
+                    const current = SettingsStore.getBuckets();
+                    const target = current.find(cb => cb.id === currentlyEditingBucketId);
+                    if (target && target.sources[idx]) {
+                        target.sources[idx].metaTitle = meta.title;
+                        target.sources[idx].metaThumb = meta.thumbnail;
+                        SettingsStore.setBuckets(current);
+                        renderShelfEditorSources();
+                    }
+                }
+            }
+        });
+    });
+
+    const delSrcBtns = container.querySelectorAll('.btn-delete-src');
+    delSrcBtns.forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const idx = parseInt(e.target.getAttribute('data-index'), 10);
+            if (confirm('Remove this source?')) {
+                saveModalStateToMemory();
+                const current = SettingsStore.getBuckets();
+                const target = current.find(cb => cb.id === currentlyEditingBucketId);
+                target.sources.splice(idx, 1);
+                SettingsStore.setBuckets(current);
+                renderShelfEditorSources();
+            }
+        });
+    });
+
+    const digBtns = container.querySelectorAll('.btn-dig-src');
     digBtns.forEach(btn => {
         btn.addEventListener('click', async (e) => {
             const sourceId = e.target.getAttribute('data-source-id');
             if (!sourceId || sourceId.length <= 5) {
-                alert('Please enter a valid Source ID first.');
+                alert('Please enter a valid Source ID and save first.');
                 return;
             }
-            
             const oldHtml = e.target.innerHTML;
             e.target.innerHTML = 'Digging...';
             e.target.disabled = true;
-            
             try {
                 const pool = await HistoryStore.getPool(sourceId);
-                const activeBucket = SettingsStore.getBuckets().find(b => b.sources.some(s => s.id === sourceId));
+                const activeBucket = SettingsStore.getBuckets().find(b => b.id === currentlyEditingBucketId);
                 const sourceConfig = activeBucket ? activeBucket.sources.find(s => s.id === sourceId) : null;
                 
                 const targetId = await YouTubeApi.resolveChannelId(sourceId);
@@ -628,13 +641,10 @@ async function populatePoolCounts() {
                 
                 for (const raw of rawVideos) {
                     if (pool.ids.includes(raw.id)) continue;
-                    
                     const watched = await HistoryStore.isWatched(raw.id);
                     if (watched) continue;
-                    
                     const dismissed = await HistoryStore.isDismissed(raw.id);
                     if (dismissed) continue;
-                    
                     const detail = details.find(d => d.id === raw.id);
                     if (!detail) continue;
 
@@ -642,7 +652,6 @@ async function populatePoolCounts() {
                         newIds.push(raw.id);
                     }
                 }
-
                 
                 pool.ids.push(...newIds);
                 pool.nextPageToken = rawVideos.nextPageToken || '';
@@ -654,9 +663,8 @@ async function populatePoolCounts() {
                 await HistoryStore.savePool(sourceId, pool);
                 alert(`Found ${newIds.length} new vetted videos!\nArchive Progress: Page ${pool.currentPageIndex} of ${totalPages}`);
                 
-                const labelEl = document.querySelector(`.pool-count-label[data-source-id="${sourceId}"]`);
+                const labelEl = container.querySelector(`.pool-count-label[data-source-id="${sourceId}"]`);
                 if (labelEl) labelEl.innerHTML = `Pool: ${pool.ids.length}`;
-                
             } catch (err) {
                 console.error('Dig failed:', err);
                 alert('Failed to dig for videos.');
@@ -667,58 +675,104 @@ async function populatePoolCounts() {
         });
     });
 
-    const resetBtns = document.querySelectorAll('.btn-reset-pool');
+    const resetBtns = container.querySelectorAll('.btn-reset-pool');
     resetBtns.forEach(btn => {
         btn.addEventListener('click', async (e) => {
             const sourceId = e.target.getAttribute('data-source-id');
             if (!sourceId) return;
-            
             if (confirm('Clear all videos in this pool and start over?')) {
                 await HistoryStore.clearPool(sourceId);
-                const labelEl = document.querySelector(`.pool-count-label[data-source-id="${sourceId}"]`);
+                const labelEl = container.querySelector(`.pool-count-label[data-source-id="${sourceId}"]`);
                 if (labelEl) labelEl.innerHTML = `Pool: 0`;
-                alert('Pool cleared. Click Dig to harvest fresh vetted content.');
+                alert('Pool cleared.');
             }
         });
     });
+
+    const labels = container.querySelectorAll('.pool-count-label');
+    for (const label of labels) {
+        const sourceId = label.getAttribute('data-source-id');
+        if (sourceId && sourceId.length > 5) {
+            const pool = await HistoryStore.getPool(sourceId);
+            label.innerHTML = `Pool: ${pool.ids.length}`;
+        } else {
+            label.innerHTML = `Pool: 0`;
+        }
+    }
 }
 
+function saveModalStateToMemory() {
+    if (!currentlyEditingBucketId) return;
+    const container = document.getElementById('shelf-editor-sources');
+    const srcNodes = container.querySelectorAll('.source-editor');
+    const sources = [];
+    srcNodes.forEach(node => {
+        sources.push({
+            id: node.querySelector('.s-id').value,
+            keywords: node.querySelector('.s-keywords').value,
+            shortsConstraint: node.querySelector('.s-shorts').value,
+            recency: node.querySelector('.s-recency').value,
+            priority: node.querySelector('.s-priority').value,
+            isRepeatable: node.querySelector('.s-repeatable').checked,
+            forcePlayType: node.querySelector('.s-force-type').value,
+            forcePlayInterval: parseInt(node.querySelector('.s-force-interval').value, 10) || null,
+            metaTitle: node.getAttribute('data-meta-title'),
+            metaThumb: node.getAttribute('data-meta-thumb')
+        });
+    });
 
+    const currentBuckets = SettingsStore.getBuckets();
+    const target = currentBuckets.find(b => b.id === currentlyEditingBucketId);
+    if (target) {
+        target.name = document.getElementById('input-shelf-name').value;
+        target.keywords = document.getElementById('input-shelf-keywords').value;
+        target.shortsConstraint = document.getElementById('select-shelf-shorts').value;
+        target.sources = sources;
+        SettingsStore.setBuckets(currentBuckets);
+    }
+}
 
-function saveBucketsFromDOM() {
-   const container = document.getElementById('buckets-accordion');
-   const editors = container.querySelectorAll('.bucket-editor');
-   const newBuckets = [];
-   
-   editors.forEach(ed => {
-      const srcNodes = ed.querySelectorAll('.source-editor');
-      const sources = [];
-      srcNodes.forEach(node => {
-          sources.push({
-             id: node.querySelector('.s-id').value,
-             keywords: node.querySelector('.s-keywords').value,
-             shortsConstraint: node.querySelector('.s-shorts').value,
-             recency: node.querySelector('.s-recency').value,
-             priority: node.querySelector('.s-priority').value,
-             isRepeatable: node.querySelector('.s-repeatable').checked,
-             forcePlayType: node.querySelector('.s-force-type').value,
-             forcePlayInterval: parseInt(node.querySelector('.s-force-interval').value, 10) || null,
-             metaTitle: node.getAttribute('data-meta-title'),
-             metaThumb: node.getAttribute('data-meta-thumb')
-          });
-      });
+// Global Event Handlers for Shelf Modal Buttons
+document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('btn-close-shelf-editor').addEventListener('click', () => {
+        saveModalStateToMemory();
+        document.getElementById('shelf-editor-modal').classList.remove('active');
+        document.getElementById('shelf-editor-modal').classList.add('hidden');
+        document.getElementById('player-view').classList.remove('hidden');
+        document.getElementById('player-view').classList.add('active');
+        populateBucketSelector();
+        renderShelvesMenu();
+    });
 
-      newBuckets.push({
-         id: ed.querySelector('.b-name').getAttribute('data-id'),
-         name: ed.querySelector('.b-name').value,
-         sources: sources,
-         keywords: ed.querySelector('.b-keywords').value,
-         shortsConstraint: 'allow_all'
-      });
+    document.getElementById('btn-save-shelf-modal').addEventListener('click', () => {
+        saveModalStateToMemory();
+        alert('Shelf configuration saved successfully.');
+        document.getElementById('btn-close-shelf-editor').click();
+    });
 
-   });
-   
-   SettingsStore.setBuckets(newBuckets);
+    document.getElementById('btn-add-shelf-source').addEventListener('click', () => {
+        saveModalStateToMemory();
+        const current = SettingsStore.getBuckets();
+        const target = current.find(cb => cb.id === currentlyEditingBucketId);
+        if (target) {
+            target.sources.push({ id:'', keywords:'', shortsConstraint:'mix', recency:'all', priority:'medium' });
+            SettingsStore.setBuckets(current);
+            renderShelfEditorSources();
+        }
+    });
+
+    document.getElementById('btn-delete-shelf').addEventListener('click', () => {
+        if (confirm('Are you sure you want to delete this shelf entirely?')) {
+            let current = SettingsStore.getBuckets();
+            current = current.filter(cb => cb.id !== currentlyEditingBucketId);
+            if (current.length === 0) {
+                current.push({ id:'bucket_1', name:'Default Shelf', sources:[], keywords:'', shortsConstraint:'max_3' });
+            }
+            SettingsStore.setBuckets(current);
+            document.getElementById('btn-close-shelf-editor').click();
+        }
+    });
+});setBuckets(newBuckets);
 }
 
 function populateBucketSelector() {

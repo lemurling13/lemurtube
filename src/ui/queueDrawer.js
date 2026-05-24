@@ -6,11 +6,38 @@ export const QueueDrawer = {
   listEl: null,
   playVideoCallback: null,
   filterState: 'all',
+  channelFilterState: 'all',
 
   matchesFilter(video) {
+    if (this.channelFilterState !== 'all' && video.sourceId !== this.channelFilterState) {
+        return false;
+    }
     if (this.filterState === 'shorts') return video.isShort;
     if (this.filterState === 'no_shorts') return !video.isShort;
     return true;
+  },
+
+  updateChannelFilterUI(queue) {
+      const selectEl = document.getElementById('select-channel-filter');
+      if (!selectEl) return;
+      
+      const currentVal = this.channelFilterState;
+      selectEl.innerHTML = '<option value="all">Channels: All</option>';
+      
+      const uniqueSources = {};
+      queue.forEach(v => {
+          if (v.sourceId && v.channelTitle) {
+              uniqueSources[v.sourceId] = v.channelTitle;
+          }
+      });
+      
+      Object.keys(uniqueSources).forEach(sourceId => {
+          const opt = document.createElement('option');
+          opt.value = sourceId;
+          opt.textContent = uniqueSources[sourceId];
+          if (sourceId === currentVal) opt.selected = true;
+          selectEl.appendChild(opt);
+      });
   },
 
   init(playVideoCallback) {
@@ -21,36 +48,26 @@ export const QueueDrawer = {
     filterBtn.addEventListener('click', () => {
         if (this.filterState === 'all') {
             this.filterState = 'shorts';
-            filterBtn.innerHTML = 'Shorts';
+            filterBtn.innerHTML = 'Length: Shorts';
         } else if (this.filterState === 'shorts') {
             this.filterState = 'no_shorts';
-            filterBtn.innerHTML = 'No Shorts';
+            filterBtn.innerHTML = 'Length: No Shorts';
         } else {
             this.filterState = 'all';
-            filterBtn.innerHTML = 'All';
+            filterBtn.innerHTML = 'Length: All';
         }
         this.render();
     });
 
+    const channelSelect = document.getElementById('select-channel-filter');
+    if (channelSelect) {
+        channelSelect.addEventListener('change', (e) => {
+            this.channelFilterState = e.target.value;
+            this.render();
+        });
+    }
+
     this.sortState = 'newest';
-
-    document.getElementById('btn-find-new').addEventListener('click', async (e) => {
-
-
-        const btn = e.target;
-        const oldHtml = btn.innerHTML;
-        btn.innerHTML = 'Finding...';
-        btn.disabled = true;
-        try {
-            await this.findNewVideos();
-        } catch (err) {
-            console.error(err);
-            alert('Find New failed.');
-        } finally {
-            btn.innerHTML = oldHtml;
-            btn.disabled = false;
-        }
-    });
 
     const sortBtn = document.getElementById('btn-toggle-sort');
     sortBtn.addEventListener('click', () => {
@@ -82,7 +99,6 @@ export const QueueDrawer = {
     }
 
     const drawer = document.getElementById('queue-drawer');
-    const toggleBtn = document.getElementById('btn-toggle-queue');
     const headerEl = document.getElementById('queue-drawer-handle');
     
     // Initial State Check
@@ -100,7 +116,6 @@ export const QueueDrawer = {
         }
     };
     
-    toggleBtn.addEventListener('click', (e) => { e.stopPropagation(); toggleDrawer(); });
     headerEl.addEventListener('click', toggleDrawer);
     
     // Add skip next listener
@@ -183,6 +198,7 @@ export const QueueDrawer = {
 
     // Always persist state to storage when render is called
     SettingsStore.saveQueueState(SettingsStore.getActiveBucketId() || 'default', queue);
+    this.updateChannelFilterUI(queue);
     this.renderPreview(queue);
 
     if (queue.length === 0) {
@@ -222,7 +238,6 @@ export const QueueDrawer = {
           <div class="video-title">${timedTag}${video.title}</div>
           <div class="video-meta">${video.channelTitle}${dateStr} • ${video.isShort ? 'Short' : this.formatTime(video.durationSec)}</div>
         </div>
-        ${isActive ? '<div class="playing-indicator"><svg viewBox="0 0 24 24" style="width:24px;height:24px;fill:var(--primary-accent);"><path d="M8 5v14l11-7z"/></svg></div>' : ''}
         <div style="display:flex; flex-direction:column; gap:4px; align-items:flex-end;">
             <button class="save-btn" data-id="${video.id}" style="padding:4px 8px; font-size:0.8rem; background:transparent; border:1px solid var(--primary-accent); border-radius:4px; color:var(--primary-accent); cursor:pointer;">🤍 Save</button>
             <button class="dismiss-btn" data-id="${video.id}">Dismiss</button>
@@ -481,8 +496,8 @@ export const QueueDrawer = {
     }
   },
 
-  async findNewVideos() {
-    const activeId = SettingsStore.getActiveBucketId();
+  async findNewVideos(targetBucketId) {
+    const activeId = targetBucketId || SettingsStore.getActiveBucketId();
     const buckets = SettingsStore.getBuckets();
     const activeBucket = buckets.find(b => b.id === activeId);
 
