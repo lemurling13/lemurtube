@@ -227,6 +227,15 @@ body {
   background-color: var(--border-color);
 }
 
+.action-btn:focus, .action-btn:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
+button:focus, select:focus {
+  outline: none;
+}
+
 .action-btn.wildcard-btn {
   background-color: rgba(201, 122, 249, 0.15);
   color: var(--primary-accent);

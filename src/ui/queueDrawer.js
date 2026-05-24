@@ -7,6 +7,7 @@ export const QueueDrawer = {
   playVideoCallback: null,
   filterState: 'all',
   channelFilterState: 'all',
+  channelNamesCache: {},
 
   matchesFilter(video) {
     if (this.channelFilterState !== 'all' && video.sourceId !== this.channelFilterState) {
@@ -28,8 +29,13 @@ export const QueueDrawer = {
       queue.forEach(v => {
           if (v.sourceId && v.channelTitle) {
               uniqueSources[v.sourceId] = v.channelTitle;
+              this.channelNamesCache[v.sourceId] = v.channelTitle;
           }
       });
+
+      if (currentVal !== 'all' && !uniqueSources[currentVal]) {
+          uniqueSources[currentVal] = this.channelNamesCache[currentVal] || 'Active Filter';
+      }
       
       Object.keys(uniqueSources).forEach(sourceId => {
           const opt = document.createElement('option');

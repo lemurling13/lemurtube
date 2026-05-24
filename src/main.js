@@ -201,6 +201,18 @@ function initMainApp() {
   document.getElementById('btn-close-shelves-menu').addEventListener('click', toggleMenu);
   drawerBackdrop.addEventListener('click', toggleMenu);
 
+  const btnDrawerSettings = document.getElementById('btn-drawer-open-settings');
+  if (btnDrawerSettings) {
+      btnDrawerSettings.addEventListener('click', () => {
+          toggleMenu(); // close drawer
+          views.player.classList.remove('active');
+          views.player.classList.add('hidden');
+          views.settings.classList.remove('hidden');
+          views.settings.classList.add('active');
+          document.getElementById('input-youtube-api-key').value = SettingsStore.getYoutubeApiKey();
+      });
+  }
+
   document.getElementById('btn-create-shelf').addEventListener('click', () => {
       const buckets = SettingsStore.getBuckets();
       const newId = `bucket_${Date.now()}`;
@@ -818,6 +830,8 @@ function playVideo(videoObj, autoStart = true) {
           ]
       });
   }
+
+  QueueDrawer.render();
 
   const container = document.getElementById('youtube-player');
   container.innerHTML = '';
