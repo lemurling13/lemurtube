@@ -1,4 +1,4 @@
-const CACHE_NAME = 'lemurtube-v3.0.1';
+const CACHE_NAME = 'lemurtube-v3.0.3';
 
 
 
@@ -35,7 +35,15 @@ const APP_URLS = [
 self.addEventListener('install', (e) => {
   e.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(APP_URLS);
+      return Promise.all(
+        APP_URLS.map(url => {
+          return fetch(new Request(url, { cache: 'no-store' })).then(response => {
+            if (response.ok) {
+              return cache.put(url, response);
+            }
+          });
+        })
+      );
     })
   );
   self.skipWaiting();
