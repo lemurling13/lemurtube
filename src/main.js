@@ -392,6 +392,9 @@ async function renderHistoryTab(storeName, append = false) {
        } else {
            loadMoreBtn.style.display = 'none';
        }
+   }
+}
+
 let currentlyEditingBucketId = null;
 
 function renderShelvesMenu() {
