@@ -6,7 +6,7 @@ import { YouTubeApi } from './api/youtube.js';
 let player;
 let isYoutubeApiReady = false;
 
-document.addEventListener('DOMContentLoaded', () => {
+function initMainApp() {
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('./sw.js')
       .then(() => console.log('Service Worker Registered'))
@@ -293,7 +293,13 @@ document.addEventListener('DOMContentLoaded', () => {
   populateBucketSelector();
 
   QueueDrawer.init(playVideo);
-});
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initMainApp);
+} else {
+    initMainApp();
+}
 
 async function renderHistoryTab(storeName, append = false) {
    const container = document.getElementById('history-list-container');
@@ -733,7 +739,7 @@ function saveModalStateToMemory() {
 }
 
 // Global Event Handlers for Shelf Modal Buttons
-document.addEventListener('DOMContentLoaded', () => {
+function initModalHandlers() {
     document.getElementById('btn-close-shelf-editor').addEventListener('click', () => {
         saveModalStateToMemory();
         document.getElementById('shelf-editor-modal').classList.remove('active');
@@ -772,7 +778,13 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('btn-close-shelf-editor').click();
         }
     });
-});
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initModalHandlers);
+} else {
+    initModalHandlers();
+}
 
 function populateBucketSelector() {
     const selector = document.getElementById('bucket-selector');
