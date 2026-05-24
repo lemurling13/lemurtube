@@ -60,95 +60,107 @@ export const QueueEngine = {
     });
   },
 
+  async validateVideoCandidate(detail, raw, bucketConfig, sourceConfig) {
+      if (!detail) {
+          this.lastRejectionStats.noDetails++;
+          return false;
+      }
+
+      if (this.isTooShort(detail.durationSec)) {
+          console.log(`[Diagnostic] Skipped "${detail.title}": Duration too short (${detail.durationSec}s). Auto-dismissing.`);
+          this.lastRejectionStats.tooShort++;
+          await HistoryStore.markDismissed({ id: detail.id, title: detail.title, durationSec: detail.durationSec, timestamp: Date.now() });
+          return false;
+      }
+
+      const dateToUse = detail.publishedAt || raw.publishedAt;
+      if (sourceConfig?.recency === 'only_new' && dateToUse) {
+          const pubDate = new Date(dateToUse).getTime();
+          if (Date.now() - pubDate > 14 * 24 * 60 * 60 * 1000) {
+              this.lastRejectionStats.recency++;
+              return false;
+          }
+      }
+
+      if (!this.evaluateKeywordString(sourceConfig?.keywords, detail.title) || !this.evaluateKeywordString(bucketConfig?.keywords, detail.title)) {
+          console.log(`[Diagnostic] Skipped "${detail.title}": Blocked by keyword rules`);
+          this.lastRejectionStats.keywords++;
+          return false;
+      }
+
+      const isSht = this.isShort(detail.durationSec);
+      const sourceShortsRule = sourceConfig?.shortsConstraint || 'mix';
+      if (sourceShortsRule === 'no_shorts' && isSht) {
+          console.log(`[Diagnostic] Skipped "${detail.title}": Blocked by SOURCE No-Shorts rule`);
+          this.lastRejectionStats.shorts++;
+          return false;
+      }
+      if (sourceShortsRule === 'only_shorts' && !isSht) {
+          console.log(`[Diagnostic] Skipped "${detail.title}": Blocked by SOURCE Only-Shorts rule (Is standard video)`);
+          this.lastRejectionStats.shorts++;
+          return false;
+      }
+
+      const bucketShortsRule = bucketConfig?.shortsConstraint || 'max_3';
+      if (bucketShortsRule === 'no_shorts' && isSht) {
+          console.log(`[Diagnostic] Skipped "${detail.title}": Blocked by GLOBAL No-Shorts rule`);
+          this.lastRejectionStats.shorts++;
+          return false;
+      }
+      if (bucketShortsRule === 'only_shorts' && !isSht) {
+          console.log(`[Diagnostic] Skipped "${detail.title}": Blocked by GLOBAL Only-Shorts rule (Is standard video)`);
+          this.lastRejectionStats.shorts++;
+          return false;
+      }
+
+      return true;
+  },
+
   async filterAndEnrichVideos(rawVideos, bucketConfig, sourceConfig) {
-    const videoIds = rawVideos.map(v => v.id);
-    const details = await YouTubeApi.fetchVideoDetails(videoIds);
-    
-    let validVideos = [];
-    
-    // Reset stats
-    this.lastRejectionStats = { recency: 0, keywords: 0, shorts: 0, tooShort: 0, noDetails: 0 };
-    
-    console.log(`[Diagnostic] Filtering ${rawVideos.length} raw videos...`);
+      const videoIds = rawVideos.map(v => v.id);
+      const details = await YouTubeApi.fetchVideoDetails(videoIds);
+      
+      let validVideos = [];
+      this.lastRejectionStats = { recency: 0, keywords: 0, shorts: 0, tooShort: 0, noDetails: 0, history: 0 };
+      
+      console.log(`[Diagnostic] Filtering ${rawVideos.length} raw videos...`);
 
-    for (const raw of rawVideos) {
-        const detail = details.find(d => d.id === raw.id);
-        if (!detail) { 
-            console.log(`[Diagnostic] Skipped ID "${raw.id}": API returned no details (Region locked or deleted)`); 
-            this.lastRejectionStats.noDetails++;
-            continue; 
-        }
+      for (const raw of rawVideos) {
+          const detail = details.find(d => d.id === raw.id);
+          if (!detail) {
+              console.log(`[Diagnostic] Skipped ID "${raw.id}": API returned no details`);
+              this.lastRejectionStats.noDetails++;
+              continue;
+          }
 
-        if (!sourceConfig?.isRepeatable) {
-            const watched = await HistoryStore.isWatched(raw.id);
-            if (watched) { 
-                console.log(`[Diagnostic] Skipped "${detail.title}": Already Watched in Local History`); 
-                this.lastRejectionStats.history++;
-                continue; 
-            }
+          if (!sourceConfig?.isRepeatable) {
+              const watched = await HistoryStore.isWatched(raw.id);
+              if (watched) { 
+                  console.log(`[Diagnostic] Skipped "${detail.title}": Already Watched in Local History`); 
+                  this.lastRejectionStats.history++;
+                  continue; 
+              }
 
-            const dismissed = await HistoryStore.isDismissed(raw.id);
-            if (dismissed) { 
-                console.log(`[Diagnostic] Skipped "${detail.title}": Already Dismissed in Local History`); 
-                this.lastRejectionStats.history++;
-                continue; 
-            }
-        } else {
+              const dismissed = await HistoryStore.isDismissed(raw.id);
+              if (dismissed) { 
+                  console.log(`[Diagnostic] Skipped "${detail.title}": Already Dismissed in Local History`); 
+                  this.lastRejectionStats.history++;
+                  continue; 
+              }
+          } else {
+              console.log(`[Diagnostic] History Bypass Active for "${detail.title}" (Repeatable Source)`);
+          }
 
-            console.log(`[Diagnostic] History Bypass Active for "${detail.title}" (Repeatable Source)`);
-        }
+          if (await this.validateVideoCandidate(detail, raw, bucketConfig, sourceConfig)) {
+              validVideos.push({
+                  ...detail,
+                  isShort: this.isShort(detail.durationSec)
+              });
+          }
+      }
 
-        if (this.isTooShort(detail.durationSec)) { 
-            console.log(`[Diagnostic] Skipped "${detail.title}": Duration too short (${detail.durationSec}s). Auto-dismissing.`); 
-            this.lastRejectionStats.tooShort++;
-            await HistoryStore.markDismissed({ id: raw.id, title: detail.title, durationSec: detail.durationSec, timestamp: Date.now() });
-            continue; 
-        }
-
-        if (!this.evaluateKeywordString(sourceConfig?.keywords, detail.title) || !this.evaluateKeywordString(bucketConfig.keywords, detail.title)) {
-            console.log(`[Diagnostic] Skipped "${detail.title}": Blocked by keyword rules`);
-            this.lastRejectionStats.keywords++;
-            continue;
-        }
-
-        const isSht = this.isShort(detail.durationSec);
-        
-        // 2. Cascade Shorts Logic
-        const sourceShortsRule = sourceConfig?.shortsConstraint || 'mix';
-        if (sourceShortsRule === 'no_shorts' && isSht) { 
-            console.log(`[Diagnostic] Skipped "${detail.title}": Blocked by SOURCE No-Shorts rule RegExp`); 
-            this.lastRejectionStats.shorts++;
-            continue; 
-        }
-        if (sourceShortsRule === 'only_shorts' && !isSht) { 
-            console.log(`[Diagnostic] Skipped "${detail.title}": Blocked by SOURCE Only-Shorts rule (Is standard video)`); 
-            this.lastRejectionStats.shorts++;
-            continue; 
-        }
-
-        const bucketShortsRule = bucketConfig.shortsConstraint || 'max_3';
-        if (bucketShortsRule === 'no_shorts' && isSht) { 
-            console.log(`[Diagnostic] Skipped "${detail.title}": Blocked by GLOBAL No-Shorts rule`); 
-            this.lastRejectionStats.shorts++;
-            continue; 
-        }
-        if (bucketShortsRule === 'only_shorts' && !isSht) { 
-            console.log(`[Diagnostic] Skipped "${detail.title}": Blocked by GLOBAL Only-Shorts rule (Is standard video)`); 
-            this.lastRejectionStats.shorts++;
-            continue; 
-        }
-
-        validVideos.push({
-            ...detail,
-            isShort: isSht
-        });
-    }
-
-
-
-    
-    console.log(`[Diagnostic] Surviving videos: ${validVideos.length}`);
-    return validVideos;
+      console.log(`[Diagnostic] Surviving videos: ${validVideos.length}`);
+      return validVideos;
   },
 
   smartInsert(newVideos, toTop = false, shortsConstraint = 'max_3') {

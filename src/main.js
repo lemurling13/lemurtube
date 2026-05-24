@@ -26,22 +26,12 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
 
-  const debugEl = document.getElementById('orientation-debug');
   const handleOrientationUpdate = () => {
-      const w = window.innerWidth;
-      const h = window.innerHeight;
-      const isLandscape = w > h;
-      
-      if (debugEl) {
-          debugEl.innerHTML = `Dim: ${w}x${h} | Mode: ${isLandscape ? 'Land' : 'Port'}`;
-      }
-      
+      const isLandscape = window.innerWidth > window.innerHeight;
       if (isLandscape) {
           document.body.classList.add('app-fullscreen');
-          console.log('[Diagnostic Trace] Entering Root Landscape Maximization (Multi)');
       } else {
           document.body.classList.remove('app-fullscreen');
-          console.log('[Diagnostic Trace] Exiting Root Landscape Maximization (Multi)');
       }
   };
   
@@ -50,7 +40,6 @@ document.addEventListener('DOMContentLoaded', () => {
   if (screen.orientation) {
       screen.orientation.addEventListener('change', handleOrientationUpdate);
   }
-  // Run once on load
   handleOrientationUpdate();
 
 
@@ -663,24 +652,9 @@ async function populatePoolCounts() {
                     const detail = details.find(d => d.id === raw.id);
                     if (!detail) continue;
 
-                    if (QueueEngine.isTooShort(detail.durationSec)) {
-                        console.log(`[Diagnostic] Dig skipped "${detail.title}": Duration too short (${detail.durationSec}s). Auto-dismissing.`);
-                        await HistoryStore.markDismissed({ id: raw.id, title: detail.title, durationSec: detail.durationSec, timestamp: Date.now() });
-                        continue;
+                    if (await QueueEngine.validateVideoCandidate(detail, raw, activeBucket, sourceConfig)) {
+                        newIds.push(raw.id);
                     }
-                    
-                    // 1. Enforce Recency Constraint (<14 days)
-                    const dateToUse = detail.publishedAt || raw.publishedAt;
-                    if (sourceConfig?.recency === 'only_new' && dateToUse) {
-                       const pubDate = new Date(dateToUse).getTime();
-                       const DAYS_14 = 14 * 24 * 60 * 60 * 1000;
-                       if (Date.now() - pubDate > DAYS_14) continue;
-                    }
-                    
-                    if (!QueueEngine.evaluateKeywordString(sourceConfig?.keywords, detail.title)) continue;
-                    if (!QueueEngine.evaluateKeywordString(activeBucket?.keywords, detail.title)) continue;
-                    
-                    newIds.push(raw.id);
                 }
 
                 
@@ -881,8 +855,19 @@ async function onPlayerStateChange(event) {
             if (nextIdx < queue.length) {
                 QueueEngine.setActiveIndex(nextIdx);
                 playVideo(queue[nextIdx], true);
+            } else if (queue.length > 0) {
+                let loopIdx = 0;
+                while (loopIdx < queue.length && !QueueDrawer.matchesFilter(queue[loopIdx])) {
+                    loopIdx++;
+                }
+                if (loopIdx < queue.length) {
+                    QueueEngine.setActiveIndex(loopIdx);
+                    playVideo(queue[loopIdx], true);
+                } else {
+                    document.getElementById('youtube-player').innerHTML = '';
+                }
             } else {
-                document.getElementById('youtube-player').innerHTML = ''; // Clear player
+                document.getElementById('youtube-player').innerHTML = '';
             }
         } else if (queue.length === 0) {
             document.getElementById('youtube-player').innerHTML = ''; // Clear video

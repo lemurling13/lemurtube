@@ -117,19 +117,32 @@ export const QueueDrawer = {
             QueueEngine.setQueue(queue); // update immediately
             this.render(); // redraw UI
             
-            // Re-fetch remaining queue length for edge case check
             const newLen = QueueEngine.getQueue().length;
             
             if (activeIdx < newLen) {
-                // Next video organically shifted into activeIdx
-                this.playVideoCallback(queue[activeIdx], SettingsStore.getAutoplay());
+                let nextIdx = activeIdx;
+                while (nextIdx < queue.length && !this.matchesFilter(queue[nextIdx])) {
+                    nextIdx++;
+                }
+                if (nextIdx < queue.length) {
+                    QueueEngine.setActiveIndex(nextIdx);
+                    this.playVideoCallback(queue[nextIdx], SettingsStore.getAutoplay());
+                } else {
+                    document.getElementById('youtube-player').innerHTML = '';
+                }
             } else if (newLen > 0) {
-                // We reached the absolute bottom of the list, loop back to top
-                QueueEngine.setActiveIndex(0);
-                this.playVideoCallback(queue[0], SettingsStore.getAutoplay());
+                let nextIdx = 0;
+                while (nextIdx < queue.length && !this.matchesFilter(queue[nextIdx])) {
+                    nextIdx++;
+                }
+                if (nextIdx < queue.length) {
+                    QueueEngine.setActiveIndex(nextIdx);
+                    this.playVideoCallback(queue[nextIdx], SettingsStore.getAutoplay());
+                } else {
+                    document.getElementById('youtube-player').innerHTML = '';
+                }
             } else {
-                // We deleted the very last video and the list is now totally empty
-                document.getElementById('youtube-player').innerHTML = ''; // Clear video
+                document.getElementById('youtube-player').innerHTML = '';
             }
         }
     });
@@ -250,17 +263,27 @@ export const QueueDrawer = {
         
         this.render();
         
-        // If we dismissed the currently loaded/playing video, load the next one
         if (isActive) {
-            let nextActive = QueueEngine.getActiveIndex(); // It's now the item that shifted UP to `index` position
-            if (nextActive < QueueEngine.queue.length) {
-                this.playVideoCallback(QueueEngine.queue[nextActive], SettingsStore.getAutoplay());
+            let nextIdx = QueueEngine.getActiveIndex();
+            while (nextIdx < QueueEngine.queue.length && !this.matchesFilter(QueueEngine.queue[nextIdx])) {
+                nextIdx++;
+            }
+            if (nextIdx < QueueEngine.queue.length) {
+                QueueEngine.setActiveIndex(nextIdx);
+                this.playVideoCallback(QueueEngine.queue[nextIdx], SettingsStore.getAutoplay());
             } else if (QueueEngine.queue.length > 0) {
-                // we exhausted the list, loop back
-                QueueEngine.setActiveIndex(0);
-                this.playVideoCallback(QueueEngine.queue[0], SettingsStore.getAutoplay());
+                let loopIdx = 0;
+                while (loopIdx < QueueEngine.queue.length && !this.matchesFilter(QueueEngine.queue[loopIdx])) {
+                    loopIdx++;
+                }
+                if (loopIdx < QueueEngine.queue.length) {
+                    QueueEngine.setActiveIndex(loopIdx);
+                    this.playVideoCallback(QueueEngine.queue[loopIdx], SettingsStore.getAutoplay());
+                } else {
+                    document.getElementById('youtube-player').innerHTML = '';
+                }
             } else {
-                document.getElementById('youtube-player').innerHTML = ''; // Clear player
+                document.getElementById('youtube-player').innerHTML = '';
             }
         }
       });
@@ -282,11 +305,17 @@ export const QueueDrawer = {
       
       if (queue.length === 0) {
           previewEl.textContent = 'Empty Window';
-      } else if (activeIdx + 1 < queue.length) {
-          const nextVid = queue[activeIdx + 1];
-          previewEl.textContent = `${nextVid.channelTitle} - ${nextVid.title}`;
       } else {
-          previewEl.textContent = 'End of Queue';
+          let nextIdx = activeIdx + 1;
+          while (nextIdx < queue.length && !this.matchesFilter(queue[nextIdx])) {
+              nextIdx++;
+          }
+          if (nextIdx < queue.length) {
+              const nextVid = queue[nextIdx];
+              previewEl.textContent = `${nextVid.channelTitle} - ${nextVid.title}`;
+          } else {
+              previewEl.textContent = 'End of Queue';
+          }
       }
   },
 
@@ -460,7 +489,6 @@ export const QueueDrawer = {
     if (!activeBucket || !activeBucket.sources) return;
 
     let totalNewFound = 0;
-    let addedToQueueCount = 0;
 
     for (const src of activeBucket.sources) {
         if (!src.id || src.id.trim().length < 5) continue;
@@ -488,7 +516,6 @@ export const QueueDrawer = {
             if (videoIds.length > 0) details = await YouTubeApi.fetchVideoDetails(videoIds);
 
             const newIds = [];
-            const newVideosForQueue = [];
 
             for (const raw of rawVideos) {
                 if (pool.ids.includes(raw.id)) continue;
@@ -500,30 +527,8 @@ export const QueueDrawer = {
                 const detail = details.find(d => d.id === raw.id);
                 if (!detail) continue;
 
-                if (QueueEngine.isTooShort(detail.durationSec)) {
-                   console.log(`[Diagnostic] FindNew skipped "${detail.title}": Duration too short (${detail.durationSec}s). Auto-dismissing.`);
-                   await HistoryStore.markDismissed({ id: raw.id, title: detail.title, durationSec: detail.durationSec, timestamp: Date.now() });
-                   continue;
-                }
-
-                const dateToUse = detail.publishedAt || raw.publishedAt;
-                if (src.recency === 'only_new' && dateToUse) {
-                   const pubDate = new Date(dateToUse).getTime();
-                   if (Date.now() - pubDate > 14 * 24 * 60 * 60 * 1000) continue;
-                }
-
-                if (!QueueEngine.evaluateKeywordString(src.keywords, detail.title)) continue;
-                if (!QueueEngine.evaluateKeywordString(activeBucket.keywords, detail.title)) continue;
-
-                newIds.push(raw.id);
-                if (addedToQueueCount < 50) {
-                    newVideosForQueue.push({ 
-                        ...detail, 
-                        isShort: (detail.durationSec > 30 && detail.durationSec <= 180), 
-                        sourcePriority: src.priority, 
-                        sourceId: src.id 
-                    });
-                    addedToQueueCount++;
+                if (await QueueEngine.validateVideoCandidate(detail, raw, activeBucket, src)) {
+                    newIds.push(raw.id);
                 }
             }
 
@@ -534,10 +539,6 @@ export const QueueDrawer = {
 
                 const labelEl = document.querySelector(`.pool-count-label[data-source-id="${src.id}"]`);
                 if (labelEl) labelEl.innerHTML = `Pool: ${pool.ids.length}`;
-                
-                if (newVideosForQueue.length > 0) {
-                    QueueEngine.smartInsert(newVideosForQueue, false, activeBucket.shortsConstraint);
-                }
             }
         } catch (e) {
             console.error(`Find New failed for source ${src.id}:`, e);
@@ -545,8 +546,7 @@ export const QueueDrawer = {
     }
 
     if (totalNewFound > 0) {
-        this.sortQueue();
-        alert(`Discovered ${totalNewFound} new videos! (Added ${Math.min(totalNewFound, 50)} to active queue, remainder safely cached in offline pools)`);
+        alert(`Discovered ${totalNewFound} new vetted videos successfully cached in your offline candidate pools! Tap "Swap All" to load them into your queue.`);
     } else {
         alert('No new uploads found.');
     }
