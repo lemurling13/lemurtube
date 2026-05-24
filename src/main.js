@@ -772,8 +772,7 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('btn-close-shelf-editor').click();
         }
     });
-});setBuckets(newBuckets);
-}
+});
 
 function populateBucketSelector() {
     const selector = document.getElementById('bucket-selector');
