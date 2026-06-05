@@ -101,18 +101,6 @@ export const QueueEngine = {
           return false;
       }
 
-      const bucketShortsRule = bucketConfig?.shortsConstraint || 'max_3';
-      if (bucketShortsRule === 'no_shorts' && isSht) {
-          console.log(`[Diagnostic] Skipped "${detail.title}": Blocked by GLOBAL No-Shorts rule`);
-          this.lastRejectionStats.shorts++;
-          return false;
-      }
-      if (bucketShortsRule === 'only_shorts' && !isSht) {
-          console.log(`[Diagnostic] Skipped "${detail.title}": Blocked by GLOBAL Only-Shorts rule (Is standard video)`);
-          this.lastRejectionStats.shorts++;
-          return false;
-      }
-
       return true;
   },
 
@@ -163,29 +151,13 @@ export const QueueEngine = {
       return validVideos;
   },
 
-  smartInsert(newVideos, toTop = false, shortsConstraint = 'max_3') {
+  smartInsert(newVideos, toTop = false) {
     const itemsToAdd = [];
-    
-    // Check if there are ANY non-shorts in the candidate pool that aren't duplicates
-    const candidates = newVideos.filter(video => !this.queue.some(v => v.id === video.id));
-    const hasNonShorts = candidates.some(v => !v.isShort);
     
     for (const video of newVideos) {
       if (this.queue.some(v => v.id === video.id)) continue;
-      
-      if (video.isShort && shortsConstraint === 'max_3') {
-        const recentContext = [...this.queue, ...itemsToAdd].slice(-3);
-        const recentShortsCount = recentContext.filter(v => v.isShort).length;
-        
-        // Only skip the short if it breaks the streak AND we actually have non-shorts available to interleave!
-        if (recentShortsCount >= 3 && hasNonShorts) {
-          console.log(`[Diagnostic] Skipped short "${video.title}" to break 3-short streak (Non-shorts available to fill).`);
-          continue; 
-        }
-      }
       itemsToAdd.push(video);
     }
-
     
     if (toTop) {
       this.queue.splice(1, 0, ...itemsToAdd);

@@ -246,18 +246,37 @@ export const QueueDrawer = {
           <div class="video-title">${timedTag}${video.title}</div>
           <div class="video-meta">${video.channelTitle}${dateStr} • ${video.isShort ? 'Short' : this.formatTime(video.durationSec)}</div>
         </div>
-        <div style="display:flex; flex-direction:column; gap:4px; align-items:flex-end;">
-            <button class="save-btn" data-id="${video.id}" style="padding:4px 8px; font-size:0.8rem; background:transparent; border:1px solid var(--primary-accent); border-radius:4px; color:var(--primary-accent); cursor:pointer;">🤍 Save</button>
+        <div style="display:flex; flex-direction:column; gap:12px; align-items:flex-end; justify-content:center; padding-left:4px;">
+            <button class="save-btn" data-id="${video.id}">🤍 Save</button>
             <button class="dismiss-btn" data-id="${video.id}">Dismiss</button>
         </div>
       `;
 
+      // Check saved status asynchronously and update button state instantly
+      HistoryStore.isSaved(video.id).then(saved => {
+          const btn = el.querySelector('.save-btn');
+          if (btn && saved) {
+              btn.innerHTML = '❤️ Saved';
+              btn.classList.add('saved');
+          }
+      });
+
       el.querySelector('.save-btn').addEventListener('click', async (e) => {
           e.stopPropagation();
-          await HistoryStore.markSaved(video);
-          e.target.innerHTML = '❤️ Saved';
-          e.target.style.background = 'var(--primary-accent)';
-          e.target.style.color = '#fff';
+          const btn = e.target;
+          const isCurrentlySaved = btn.classList.contains('saved');
+          
+          if (isCurrentlySaved) {
+              // Toggle Off (Unsave)
+              await HistoryStore.removeFromStore('saved', video.id);
+              btn.innerHTML = '🤍 Save';
+              btn.classList.remove('saved');
+          } else {
+              // Toggle On (Save)
+              await HistoryStore.markSaved(video);
+              btn.innerHTML = '❤️ Saved';
+              btn.classList.add('saved');
+          }
       });
 
       el.querySelector('.dismiss-btn').addEventListener('click', async (e) => {
@@ -487,8 +506,7 @@ export const QueueDrawer = {
           await HistoryStore.savePool(sourceId, pool);
       }
       
-      QueueEngine.smartInsert(finalInsert, toTop, activeBucket.shortsConstraint);
-
+      QueueEngine.smartInsert(finalInsert, toTop);
       this.sortQueue();
 
       if (QueueEngine.getQueue().length > 0 && document.getElementById('youtube-player').innerHTML === '') {

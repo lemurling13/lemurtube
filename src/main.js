@@ -220,8 +220,7 @@ function initMainApp() {
           id: newId,
           name: `New Shelf ${buckets.length + 1}`,
           sources: [],
-          keywords: '',
-          shortsConstraint: 'max_3'
+          keywords: ''
       });
       SettingsStore.setBuckets(buckets);
       renderShelvesMenu();
@@ -511,7 +510,6 @@ function openShelfEditorModal(bucketId) {
     
     document.getElementById('input-shelf-name').value = bucket.name || '';
     document.getElementById('input-shelf-keywords').value = bucket.keywords || '';
-    document.getElementById('select-shelf-shorts').value = bucket.shortsConstraint || 'max_3';
     
     renderShelfEditorSources();
 }
@@ -826,7 +824,6 @@ function saveModalStateToMemory() {
     if (target) {
         target.name = document.getElementById('input-shelf-name').value;
         target.keywords = document.getElementById('input-shelf-keywords').value;
-        target.shortsConstraint = document.getElementById('select-shelf-shorts').value;
         target.sources = sources;
         SettingsStore.setBuckets(currentBuckets);
     }
@@ -866,7 +863,7 @@ function initModalHandlers() {
             let current = SettingsStore.getBuckets();
             current = current.filter(cb => cb.id !== currentlyEditingBucketId);
             if (current.length === 0) {
-                current.push({ id:'bucket_1', name:'Default Shelf', sources:[], keywords:'', shortsConstraint:'max_3' });
+                current.push({ id:'bucket_1', name:'Default Shelf', sources:[], keywords:'' });
             }
             SettingsStore.setBuckets(current);
             document.getElementById('btn-close-shelf-editor').click();

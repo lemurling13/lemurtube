@@ -357,10 +357,10 @@ button:active {
 /* Queue Items */
 .queue-item {
   display: flex;
-  padding: 10px 8px;
+  padding: 6px 8px;
   background-color: var(--surface-color);
   border-radius: 12px;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
   gap: 8px;
   align-items: center;
   position: relative;
@@ -407,15 +407,34 @@ button:active {
   color: var(--text-secondary);
 }
 
+.save-btn {
+  background: transparent;
+  border: 1px solid var(--primary-accent);
+  color: var(--primary-accent);
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.save-btn.saved {
+  background: var(--primary-accent);
+  color: #ffffff;
+}
+
 .dismiss-btn {
   background: var(--surface-hover);
   border: none;
   color: var(--text-primary);
-  padding: 6px 10px;
+  padding: 10px 14px;
   border-radius: 6px;
   font-size: 0.8rem;
+  font-weight: 500;
   cursor: pointer;
   z-index: 10;
+  transition: background-color 0.15s;
 }
 
 .playing-indicator {

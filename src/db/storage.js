@@ -159,7 +159,7 @@ export const HistoryStore = {
         let loadedCount = 0;
         const checkComplete = () => {
           loadedCount++;
-          if (loadedCount === 2) {
+          if (loadedCount === 3) {
             this.db = tempDb;
             resolve();
           }
@@ -187,10 +187,22 @@ export const HistoryStore = {
             this.cachedDismissed = new Set();
             checkComplete();
           };
+
+          const sTx = tempDb.transaction('saved', 'readonly');
+          const sReq = sTx.objectStore('saved').getAllKeys();
+          sReq.onsuccess = () => {
+            this.cachedSaved = new Set(sReq.result || []);
+            checkComplete();
+          };
+          sReq.onerror = () => {
+            this.cachedSaved = new Set();
+            checkComplete();
+          };
         } catch (err) {
           console.error("Cache preload error:", err);
           this.cachedWatched = new Set();
           this.cachedDismissed = new Set();
+          this.cachedSaved = new Set();
           this.db = tempDb;
           resolve();
         }
@@ -296,11 +308,31 @@ export const HistoryStore = {
     });
   },
 
+  async isSaved(id) {
+    if (!id) return false;
+    if (!this.db) await this.init();
+    if (this.cachedSaved && this.cachedSaved.has(id)) return true;
+    return new Promise((resolve) => {
+      try {
+        const tx = this.db.transaction('saved', 'readonly');
+        const req = tx.objectStore('saved').get(id);
+        req.onsuccess = () => {
+          if (req.result && this.cachedSaved) this.cachedSaved.add(id);
+          resolve(!!req.result);
+        };
+        req.onerror = () => resolve(false);
+      } catch (e) {
+        resolve(false);
+      }
+    });
+  },
+
   async markSaved(video) {
     if (!video) return;
     const item = typeof video === 'string' ? { id: video, timestamp: Date.now() } : video;
     if (!item.id) return;
     if (!this.db) await this.init();
+    if (this.cachedSaved) this.cachedSaved.add(item.id);
     return new Promise((resolve, reject) => {
       try {
         const tx = this.db.transaction('saved', 'readwrite');
@@ -338,6 +370,7 @@ export const HistoryStore = {
     if (!this.db) await this.init();
     if (storeName === 'watched' && this.cachedWatched) this.cachedWatched.delete(id);
     if (storeName === 'dismissed' && this.cachedDismissed) this.cachedDismissed.delete(id);
+    if (storeName === 'saved' && this.cachedSaved) this.cachedSaved.delete(id);
     return new Promise((resolve, reject) => {
       try {
         console.log(`[Diagnostic Trace] Physically deleting habit key ${id} from store ${storeName}`);
