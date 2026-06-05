@@ -268,11 +268,17 @@ function initMainApp() {
 
   document.getElementById('btn-import-text').addEventListener('click', async () => {
       const area = document.getElementById('textarea-backup-io');
-      const text = area.value.trim();
+      let text = area.value.trim();
       if (!text) {
           alert('Please paste some backup text into the box first!');
           return;
       }
+      
+      // Sanitize smart/curly double and single quotes and mobile non-breaking spaces
+      text = text
+          .replace(/[\u201C\u201D\u201E\u201F\u2033\u2036]/g, '"')
+          .replace(/[\u2018\u2019\u201A\u201B\u2032\u2035]/g, "'")
+          .replace(/\u00A0/g, ' '); // Replace non-breaking spaces
       
       try {
           const data = JSON.parse(text);
