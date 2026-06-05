@@ -773,7 +773,7 @@ async function bindSourceConfigEvents() {
                 pool.ids = pool.ids.filter(id => !targetIds.includes(id));
                 await HistoryStore.savePool(sourceId, pool);
                 
-                document.getElementById('modal-shelf-config').style.display = 'none';
+                document.getElementById('shelf-editor-modal').classList.add('hidden');
                 
                 QueueDrawer.sortQueue();
                 if (QueueEngine.getQueue().length > 0) {
