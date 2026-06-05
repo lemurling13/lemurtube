@@ -17,7 +17,7 @@
   <div id="app" class="app-container">
     <!-- Main Player Area -->
     <main id="player-view" class="view active">
-      <header class="app-top-bar" style="display:flex; justify-content:space-between; align-items:center; padding: 12px 16px; background-color: var(--surface-color); border-bottom: 1px solid var(--border-color); z-index:100;">
+      <header class="app-top-bar" style="display:flex; justify-content:space-between; align-items:center; padding: 12px 16px; padding-top: calc(12px + env(safe-area-inset-top, 0px)); background-color: var(--surface-color); border-bottom: 1px solid var(--border-color); z-index:100;">
         <div style="display:flex; align-items:center; flex:1;">
             <div id="btn-toggle-shelves-menu" style="width: 38px; height: 38px; overflow: hidden; border-radius: 50%; margin-right: 12px; display:flex; align-items:center; justify-content:center; box-shadow: 0 0 6px rgba(187,134,252,0.3); cursor:pointer;" title="Open Shelves Menu">
                <img src="./assets/icon-512.png" style="width: 100%; height: 100%; object-fit: cover; transform: scale(1.25);" alt="Lemur Logo">
@@ -97,7 +97,6 @@
         <h2>Settings</h2>
         <button id="btn-close-settings" class="icon-btn" aria-label="Close Settings">❌</button>
       </div>
-      
       <div class="settings-content">
         <h3 style="border-bottom: 1px solid #333; padding-bottom: 8px;">Data Management</h3>
         <div style="margin-top: 16px; margin-bottom: 32px;">
@@ -121,7 +120,7 @@
         </div>
 
         <div style="text-align: center; margin-top: 32px; padding-top: 16px; border-top: 1px solid var(--border-color); color: var(--text-secondary); font-size: 0.8rem; font-family: monospace;">
-            LemurTube Curator v3.0
+            LemurTube Curator v3.0.11
         </div>
       </div>
     </section>

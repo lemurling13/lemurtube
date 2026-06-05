@@ -176,6 +176,7 @@ export const QueueDrawer = {
        this.render();
        
        if (QueueEngine.getQueue().length > 0) {
+           QueueEngine.setActiveIndex(0);
            this.playVideoCallback(QueueEngine.getQueue()[0], false); // Just spool
        } else {
            document.getElementById('youtube-player').innerHTML = '';
@@ -188,6 +189,7 @@ export const QueueDrawer = {
     this.render();
     
     if (QueueEngine.getQueue().length > 0) {
+       QueueEngine.setActiveIndex(0);
        this.playVideoCallback(QueueEngine.getQueue()[0], false); // Just spool
     }
   },
@@ -487,9 +489,10 @@ export const QueueDrawer = {
       
       QueueEngine.smartInsert(finalInsert, toTop, activeBucket.shortsConstraint);
 
-      this.render();
+      this.sortQueue();
 
       if (QueueEngine.getQueue().length > 0 && document.getElementById('youtube-player').innerHTML === '') {
+         QueueEngine.setActiveIndex(0);
          this.playVideoCallback(QueueEngine.getQueue()[0], SettingsStore.getAutoplay());
       }
       
@@ -575,6 +578,9 @@ export const QueueDrawer = {
 
   sortQueue() {
       const queue = QueueEngine.getQueue();
+      const activeIdx = QueueEngine.getActiveIndex();
+      const activeVideo = queue[activeIdx];
+
       if (this.sortState === 'newest') {
           queue.sort((a, b) => new Date(b.publishedAt || 0) - new Date(a.publishedAt || 0));
       } else if (this.sortState === 'oldest') {
@@ -586,6 +592,14 @@ export const QueueDrawer = {
           }
       }
       QueueEngine.setQueue(queue);
+
+      if (activeVideo) {
+          const newActiveIdx = queue.findIndex(v => v.id === activeVideo.id);
+          if (newActiveIdx !== -1) {
+              QueueEngine.setActiveIndex(newActiveIdx);
+          }
+      }
+
       this.render();
   },
 
@@ -615,6 +629,7 @@ export const QueueDrawer = {
      
      this.render();
      if (QueueEngine.getQueue().length > 0 && document.getElementById('youtube-player').innerHTML === '') {
+         QueueEngine.setActiveIndex(0);
          this.playVideoCallback(QueueEngine.getQueue()[0], SettingsStore.getAutoplay());
      }
   },

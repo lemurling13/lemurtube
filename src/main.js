@@ -532,6 +532,7 @@ function renderShelfEditorSources() {
             <div style="display:flex; justify-content:space-between; align-items:center; margin-top:4px; margin-bottom:8px;">
                 <span class="pool-count-label" data-source-id="${src.id || ''}">Pool: ...</span>
                 <div style="display:flex; gap: 6px;">
+                    <button class="secondary-btn btn-focus-src" data-source-id="${src.id || ''}" style="padding:2px 6px; font-size:0.75rem; border-color:#8844ff; background:transparent; color:#aa77ff;" title="Play this source exclusively">🎯 Focus</button>
                     <button class="secondary-btn btn-reset-pool" data-source-id="${src.id || ''}" style="padding:2px 6px; font-size:0.75rem; border-color:#444; background:transparent; color:#888;">♻️ Reset</button>
                     <button class="secondary-btn btn-dig-src" data-source-id="${src.id || ''}" style="padding:2px 8px; font-size:0.8rem;">⛏️ Dig</button>
                 </div>
@@ -701,11 +702,83 @@ async function bindSourceConfigEvents() {
         btn.addEventListener('click', async (e) => {
             const sourceId = e.target.getAttribute('data-source-id');
             if (!sourceId) return;
-            if (confirm('Clear all videos in this pool and start over?')) {
-                await HistoryStore.clearPool(sourceId);
-                const labelEl = container.querySelector(`.pool-count-label[data-source-id="${sourceId}"]`);
-                if (labelEl) labelEl.innerHTML = `Pool: 0`;
-                alert('Pool cleared.');
+            
+            const sourceEditorNode = e.target.closest('.source-editor');
+            const metaTitle = sourceEditorNode ? sourceEditorNode.getAttribute('data-meta-title') : '';
+            
+            if (confirm('Clear all cached videos in this pool and start over?')) {
+                const clearHistory = confirm('Do you also want to clear all watched/dismissed history for this channel/source? (This will let you see the videos again.)');
+                if (clearHistory) {
+                    await HistoryStore.resetSourceHistory(sourceId, metaTitle);
+                    const labelEl = container.querySelector(`.pool-count-label[data-source-id="${sourceId}"]`);
+                    if (labelEl) labelEl.innerHTML = `Pool: 0`;
+                    alert('Pool and watch history cleared.');
+                } else {
+                    await HistoryStore.clearPool(sourceId);
+                    const labelEl = container.querySelector(`.pool-count-label[data-source-id="${sourceId}"]`);
+                    if (labelEl) labelEl.innerHTML = `Pool: 0`;
+                    alert('Pool cleared.');
+                }
+            }
+        });
+    });
+
+    const focusBtns = container.querySelectorAll('.btn-focus-src');
+    focusBtns.forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            const sourceId = e.target.getAttribute('data-source-id');
+            if (!sourceId) return;
+            
+            e.target.disabled = true;
+            try {
+                const pool = await HistoryStore.getPool(sourceId);
+                const cleanIds = [];
+                for (const id of pool.ids) {
+                    if (await HistoryStore.isWatched(id) || await HistoryStore.isDismissed(id)) continue;
+                    cleanIds.push(id);
+                }
+                
+                const targetIds = cleanIds.slice(0, 50);
+                if (targetIds.length === 0) {
+                    alert('No unplayed videos found in the pool for this source. Try digging first!');
+                    return;
+                }
+                
+                const buckets = SettingsStore.getBuckets();
+                const activeBucket = buckets.find(b => b.id === currentlyEditingBucketId);
+                if (!activeBucket) return;
+                const srcConfig = activeBucket.sources.find(s => s.id === sourceId);
+                
+                const rawVideos = targetIds.map(id => ({ id }));
+                const enriched = await QueueEngine.filterAndEnrichVideos(rawVideos, activeBucket, srcConfig);
+                
+                if (enriched.length === 0) {
+                    alert('All candidates in the pool were filtered out by keywords or constraints.');
+                    return;
+                }
+                
+                QueueEngine.clearQueue();
+                QueueEngine.setQueue(enriched.map(v => ({
+                    ...v,
+                    sourcePriority: srcConfig?.priority || 'medium',
+                    sourceId: sourceId
+                })));
+                
+                pool.ids = pool.ids.filter(id => !targetIds.includes(id));
+                await HistoryStore.savePool(sourceId, pool);
+                
+                document.getElementById('modal-shelf-config').style.display = 'none';
+                
+                QueueDrawer.sortQueue();
+                if (QueueEngine.getQueue().length > 0) {
+                    QueueEngine.setActiveIndex(0);
+                    playVideo(QueueEngine.getQueue()[0], SettingsStore.getAutoplay());
+                }
+            } catch (err) {
+                console.error("Focus source error:", err);
+                alert("Failed to focus source: " + err.message);
+            } finally {
+                e.target.disabled = false;
             }
         });
     });
@@ -831,6 +904,14 @@ function playVideo(videoObj, autoStart = true) {
       });
   }
 
+  if (videoObj && videoObj.id) {
+     const queue = QueueEngine.getQueue();
+     const idx = queue.findIndex(v => v.id === videoObj.id);
+     if (idx !== -1) {
+         QueueEngine.setActiveIndex(idx);
+     }
+  }
+
   QueueDrawer.render();
 
   const container = document.getElementById('youtube-player');
@@ -904,42 +985,56 @@ setInterval(() => {
 async function onPlayerStateChange(event) {
   if (event.data === 0) {
     const queue = QueueEngine.getQueue();
-    const activeIdx = QueueEngine.getActiveIndex();
+    let activeIdx = QueueEngine.getActiveIndex();
     
-    if (activeIdx < queue.length) {
-       const finishedVideo = queue[activeIdx];
-       await HistoryStore.markWatched(finishedVideo);
-       
-       queue.splice(activeIdx, 1); // remove the video so it disappears from the list
-       QueueEngine.setQueue(queue);
-       QueueDrawer.render();
-       
-       // Play the next matching video
-        if (SettingsStore.getAutoplay() && activeIdx < queue.length) {
-            let nextIdx = activeIdx;
-            while (nextIdx < queue.length && !QueueDrawer.matchesFilter(queue[nextIdx])) {
-                nextIdx++;
-            }
-            if (nextIdx < queue.length) {
-                QueueEngine.setActiveIndex(nextIdx);
-                playVideo(queue[nextIdx], true);
-            } else if (queue.length > 0) {
-                let loopIdx = 0;
-                while (loopIdx < queue.length && !QueueDrawer.matchesFilter(queue[loopIdx])) {
-                    loopIdx++;
-                }
-                if (loopIdx < queue.length) {
-                    QueueEngine.setActiveIndex(loopIdx);
-                    playVideo(queue[loopIdx], true);
-                } else {
-                    document.getElementById('youtube-player').innerHTML = '';
-                }
-            } else {
-                document.getElementById('youtube-player').innerHTML = '';
-            }
-        } else if (queue.length === 0) {
-            document.getElementById('youtube-player').innerHTML = ''; // Clear video
-        }
+    let finishedVideoId = null;
+    try {
+      if (player && typeof player.getVideoData === 'function') {
+        finishedVideoId = player.getVideoData().video_id;
+      }
+    } catch (e) {}
+    
+    if (!finishedVideoId && activeIdx < queue.length) {
+      finishedVideoId = queue[activeIdx].id;
+    }
+    
+    if (finishedVideoId) {
+      const qIdx = queue.findIndex(v => v.id === finishedVideoId);
+      if (qIdx !== -1) {
+         const finishedVideo = queue[qIdx];
+         await HistoryStore.markWatched(finishedVideo);
+         
+         queue.splice(qIdx, 1);
+         QueueEngine.setQueue(queue);
+         
+         if (qIdx < activeIdx && activeIdx > 0) {
+             QueueEngine.setActiveIndex(activeIdx - 1);
+         }
+         QueueDrawer.render();
+      } else {
+         await HistoryStore.markWatched(finishedVideoId);
+      }
+      
+      if (SettingsStore.getAutoplay() && queue.length > 0) {
+         let nextIdx = QueueEngine.getActiveIndex();
+         if (nextIdx >= queue.length) {
+             nextIdx = 0;
+             QueueEngine.setActiveIndex(0);
+         }
+         
+         while (nextIdx < queue.length && !QueueDrawer.matchesFilter(queue[nextIdx])) {
+             nextIdx++;
+         }
+         
+         if (nextIdx < queue.length) {
+             QueueEngine.setActiveIndex(nextIdx);
+             playVideo(queue[nextIdx], true);
+         } else {
+             document.getElementById('youtube-player').innerHTML = '';
+         }
+      } else if (queue.length === 0) {
+         document.getElementById('youtube-player').innerHTML = '';
+      }
     }
   }
 }

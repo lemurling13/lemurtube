@@ -1,4 +1,4 @@
-const CACHE_NAME = 'lemurtube-v3.0.10';
+const CACHE_NAME = 'lemurtube-v3.0.11';
 
 
 

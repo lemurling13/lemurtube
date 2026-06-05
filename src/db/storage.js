@@ -146,27 +146,54 @@ export const HistoryStore = {
 
       req.onsuccess = () => {
         clearTimeout(timeout);
-        this.db = req.result;
+        const tempDb = req.result;
         
-        this.db.onversionchange = () => {
-           this.db.close();
-           this.db = null;
+        tempDb.onversionchange = () => {
+           tempDb.close();
+           if (this.db === tempDb) {
+              this.db = null;
+           }
            this.initPromise = null;
         };
 
+        let loadedCount = 0;
+        const checkComplete = () => {
+          loadedCount++;
+          if (loadedCount === 2) {
+            this.db = tempDb;
+            resolve();
+          }
+        };
+
         try {
-          const wTx = this.db.transaction('watched', 'readonly');
+          const wTx = tempDb.transaction('watched', 'readonly');
           const wReq = wTx.objectStore('watched').getAllKeys();
-          wReq.onsuccess = () => { this.cachedWatched = new Set(wReq.result || []); };
+          wReq.onsuccess = () => {
+            this.cachedWatched = new Set(wReq.result || []);
+            checkComplete();
+          };
+          wReq.onerror = () => {
+            this.cachedWatched = new Set();
+            checkComplete();
+          };
           
-          const dTx = this.db.transaction('dismissed', 'readonly');
+          const dTx = tempDb.transaction('dismissed', 'readonly');
           const dReq = dTx.objectStore('dismissed').getAllKeys();
-          dReq.onsuccess = () => { this.cachedDismissed = new Set(dReq.result || []); };
+          dReq.onsuccess = () => {
+            this.cachedDismissed = new Set(dReq.result || []);
+            checkComplete();
+          };
+          dReq.onerror = () => {
+            this.cachedDismissed = new Set();
+            checkComplete();
+          };
         } catch (err) {
           console.error("Cache preload error:", err);
+          this.cachedWatched = new Set();
+          this.cachedDismissed = new Set();
+          this.db = tempDb;
+          resolve();
         }
-        
-        resolve();
       };
       
       req.onerror = () => {
@@ -191,6 +218,7 @@ export const HistoryStore = {
         tx.objectStore('watched').put({ 
            id: item.id, 
            title: item.title || '', 
+           channelId: item.channelId || '',
            channelTitle: item.channelTitle || '', 
            thumbnail: item.thumbnail || '', 
            durationSec: item.durationSec || 0,
@@ -235,6 +263,7 @@ export const HistoryStore = {
         tx.objectStore('dismissed').put({ 
            id: item.id, 
            title: item.title || '', 
+           channelId: item.channelId || '',
            channelTitle: item.channelTitle || '', 
            thumbnail: item.thumbnail || '', 
            durationSec: item.durationSec || 0,
@@ -362,5 +391,27 @@ export const HistoryStore = {
         reject(e);
       }
     });
+  },
+
+  async resetSourceHistory(sourceId, channelTitle) {
+    if (!this.db) await this.init();
+    
+    // Clear pool
+    await this.clearPool(sourceId);
+    
+    const cleanStore = async (storeName) => {
+      const allItems = await this.getAllStore(storeName);
+      const toRemove = allItems.filter(item => {
+        return (item.channelId && item.channelId === sourceId) || 
+               (item.channelTitle && channelTitle && item.channelTitle.toLowerCase() === channelTitle.toLowerCase());
+      });
+      
+      for (const item of toRemove) {
+        await this.removeFromStore(storeName, item.id);
+      }
+    };
+    
+    await cleanStore('watched');
+    await cleanStore('dismissed');
   }
 };

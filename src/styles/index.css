@@ -259,6 +259,7 @@ button:focus, select:focus {
   justify-content: space-between;
   align-items: center;
   padding: 20px;
+  padding-top: calc(12px + env(safe-area-inset-top, 0px));
   border-bottom: 1px solid var(--border-color);
 }
 
@@ -517,6 +518,7 @@ button:active {
   width: 320px;
   max-width: 85vw;
   height: 100vh;
+  height: 100dvh;
   background-color: var(--surface-color);
   border-right: 1px solid var(--border-color);
   z-index: 400;
@@ -524,6 +526,8 @@ button:active {
   flex-direction: column;
   transition: transform 0.25s cubic-bezier(0.1, 0.9, 0.2, 1);
   box-shadow: 5px 0 25px rgba(0,0,0,0.5);
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 16px);
 }
 
 .side-drawer.collapsed {
