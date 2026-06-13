@@ -1,4 +1,4 @@
-:root {
+:root, [data-theme="dark"] {
   --bg-color: #0f0f13;
   --surface-color: #1c1c23;
   --surface-hover: #2d2d38;
@@ -8,6 +8,19 @@
   --text-secondary: #a0a0ab;
   --border-color: #2a2a35;
   --danger-color: #ff5252;
+  --safe-area-bottom: env(safe-area-inset-bottom, 20px);
+}
+
+[data-theme="light"] {
+  --bg-color: #f5f5fa;
+  --surface-color: #ffffff;
+  --surface-hover: #ebebf5;
+  --primary-accent: #a13bf5; /* Deep purple for high contrast */
+  --primary-accent-hover: #b869ff;
+  --text-primary: #18181f;
+  --text-secondary: #686878;
+  --border-color: #dbdbe5;
+  --danger-color: #e53e3e;
   --safe-area-bottom: env(safe-area-inset-bottom, 20px);
 }
 
@@ -184,7 +197,7 @@ body {
 
 #btn-toggle-queue {
   background-color: var(--surface-hover); /* medium gray */
-  color: #fff; /* white arrow */
+  color: var(--text-primary);
 }
 
 .drawer-header {
@@ -474,7 +487,12 @@ button:active {
     margin-bottom: 4px;
     font-size: 0.8rem;
 }
-.bucket-editor input, .bucket-editor select, .bucket-editor textarea {
+/* Global Form Inputs, Dropdowns, and Textareas */
+input[type="text"],
+input[type="number"],
+select,
+textarea,
+.form-input {
     width: 100%;
     background-color: var(--bg-color);
     border: 1px solid var(--border-color);
@@ -483,8 +501,15 @@ button:active {
     border-radius: 6px;
     outline: none;
     font-size: 0.9rem;
+    font-family: inherit;
+    transition: border-color 0.15s, box-shadow 0.15s;
 }
-.bucket-editor input:focus, .bucket-editor select:focus, .bucket-editor textarea:focus {
+
+input[type="text"]:focus,
+input[type="number"]:focus,
+select:focus,
+textarea:focus,
+.form-input:focus {
     border-color: var(--primary-accent);
 }
 
@@ -518,10 +543,10 @@ button:active {
   gap: 8px;
 }
 
+/* Compact Overrides for Nested Source Configuration Row */
 .source-config-row input, .source-config-row select {
   flex-grow: 1;
   padding: 8px;
-  font-size: 0.9rem;
 }
 
 .timed-block-item {

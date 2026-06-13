@@ -24,19 +24,34 @@ export const SettingsStore = {
     }
 
     // Migration Block: Convert old V2 string sources to V3 object arrays
+    let migrated = false;
     parsed = parsed.map(b => {
       if (typeof b.sources === 'string') {
          const list = b.sources.split(',').map(s => s.trim()).filter(s => s);
          b.sources = list.map(sourceId => ({
+            instanceId: 'src_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now().toString(36),
             id: sourceId,
             keywords: '',
             shortsConstraint: 'mix',
             recency: 'all',
             priority: 'medium'
          }));
+         migrated = true;
+      } else if (b.sources && Array.isArray(b.sources)) {
+         b.sources = b.sources.map(s => {
+            if (!s.instanceId) {
+               s.instanceId = 'src_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now().toString(36);
+               migrated = true;
+            }
+            return s;
+         });
       }
       return b;
     });
+
+    if (migrated) {
+       localStorage.setItem('lemur_buckets', JSON.stringify(parsed));
+    }
 
     return parsed;
   },
@@ -98,6 +113,14 @@ export const SettingsStore = {
 
   setYoutubeApiKey(key) {
     localStorage.setItem('lemur_youtube_api_key', key);
+  },
+
+  getTheme() {
+    return localStorage.getItem('lemur_theme') || 'dark';
+  },
+
+  setTheme(theme) {
+    localStorage.setItem('lemur_theme', theme);
   }
 };
 

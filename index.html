@@ -98,10 +98,10 @@
         <button id="btn-close-settings" class="icon-btn" aria-label="Close Settings">❌</button>
       </div>
       <div class="settings-content">
-        <h3 style="border-bottom: 1px solid #333; padding-bottom: 8px;">Data Management</h3>
+        <h3 style="border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">Data Management</h3>
         <div style="margin-top: 16px; margin-bottom: 32px;">
             <label style="display:block; margin-bottom: 6px; font-size: 0.9em; color: var(--text-secondary);">📋 Clipboard Transfer (Sync Fallback)</label>
-            <textarea id="textarea-backup-io" class="form-input" style="width: 100%; height: 80px; font-family: monospace; font-size: 0.8em; background: #1a1a1a; color: #ccc;" placeholder="Dump text here to copy... or paste text here to import."></textarea>
+            <textarea id="textarea-backup-io" class="form-input" style="width: 100%; height: 80px; font-family: monospace; font-size: 0.8em;" placeholder="Dump text here to copy... or paste text here to import."></textarea>
             <div style="display: flex; gap: 12px; margin-top: 12px;">
                 <button id="btn-export-text" class="secondary-btn" style="flex: 1; font-size: 0.8em;">📤 Generate Text</button>
                 <button id="btn-import-text" class="primary-btn" style="flex: 1; font-size: 0.8em;">📥 Import Text</button>
@@ -109,7 +109,16 @@
             <p class="help-text" style="font-size: 0.75em; margin-top: 6px;">Use this if your browser blocks the file download generator!</p>
         </div>
 
-        <h3 style="margin-top: 32px; border-bottom: 1px solid #333; padding-bottom: 8px;">Integrations</h3>
+        <h3 style="margin-top: 32px; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">Theme Settings</h3>
+        <div style="margin-top: 16px; margin-bottom: 32px;">
+            <label style="display:block; margin-bottom: 8px; font-size: 0.9em; color: var(--text-secondary);">App Theme</label>
+            <div style="display: flex; gap: 12px;">
+                <button id="btn-theme-dark" class="secondary-btn" style="flex: 1; font-size: 0.85em; padding: 8px 0;">🌙 Dark Mode</button>
+                <button id="btn-theme-light" class="secondary-btn" style="flex: 1; font-size: 0.85em; padding: 8px 0;">☀️ Light Mode</button>
+            </div>
+        </div>
+
+        <h3 style="margin-top: 32px; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">Integrations</h3>
         <div class="form-group" style="margin-bottom: 24px;">
             <label for="input-youtube-api-key" style="display:block; margin-bottom: 6px; font-size: 0.9em; color: var(--text-secondary);">YouTube Data API v3 Key</label>
             <div style="display: flex; gap: 8px;">
@@ -120,7 +129,7 @@
         </div>
 
         <div style="text-align: center; margin-top: 32px; padding-top: 16px; border-top: 1px solid var(--border-color); color: var(--text-secondary); font-size: 0.8rem; font-family: monospace;">
-            LemurTube Curator v3.0.15
+            LemurTube Curator v3.0.18
         </div>
       </div>
     </section>
@@ -186,9 +195,9 @@
         </div>
 
         <!-- Transfer Portal -->
-        <div style="margin-bottom: 16px; padding: 12px; background: #1a1a1a; border-radius: 8px;">
+        <div style="margin-bottom: 16px; padding: 12px; background: var(--surface-color); border: 1px solid var(--border-color); border-radius: 8px;">
             <label id="label-history-io" style="display:block; margin-bottom: 6px; font-size: 0.9em; color: var(--text-secondary);">📋 Saved Transfer</label>
-            <textarea id="textarea-history-io" class="form-input" style="width: 100%; height: 60px; font-family: monospace; font-size: 0.8em; background: #121212; color: #ccc;" placeholder="Dump text here..."></textarea>
+            <textarea id="textarea-history-io" class="form-input" style="width: 100%; height: 60px; font-family: monospace; font-size: 0.8em;" placeholder="Dump text here..."></textarea>
             <div style="display: flex; gap: 12px; margin-top: 8px;">
                 <button id="btn-export-history" class="secondary-btn" style="flex: 1; font-size: 0.8em;">📤 Generate</button>
                 <button id="btn-import-history" class="primary-btn" style="flex: 1; font-size: 0.8em;">📥 Import</button>

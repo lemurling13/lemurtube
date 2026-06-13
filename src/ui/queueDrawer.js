@@ -384,7 +384,7 @@ export const QueueDrawer = {
               console.log(`[Diagnostic] Skipping empty or invalid source ID in fetch: "${src.id}"`);
               return { src, rawVideos: [] };
           }
-          const pool = await HistoryStore.getPool(src.id);
+          const pool = await HistoryStore.getPool(src.instanceId || src.id);
           const cleanIds = [];
           for (const id of pool.ids) {
               if (await HistoryStore.isWatched(id) || await HistoryStore.isDismissed(id)) continue;
@@ -392,7 +392,7 @@ export const QueueDrawer = {
           }
           if (cleanIds.length !== pool.ids.length) {
               pool.ids = cleanIds;
-              await HistoryStore.savePool(src.id, pool);
+              await HistoryStore.savePool(src.instanceId || src.id, pool);
           }
           // Take top 50 candidates to give lottery pool rich variety
           const candidates = pool.ids.slice(0, 50).map(id => ({ id }));
@@ -410,7 +410,12 @@ export const QueueDrawer = {
       for (const data of allFetchedData) {
            if (data.rawVideos.length > 0) {
                 const enrichedForSource = await QueueEngine.filterAndEnrichVideos(data.rawVideos, activeBucket, data.src);
-                globalEnrichedPool = globalEnrichedPool.concat(enrichedForSource.map(v => ({...v, sourcePriority: data.src.priority, sourceId: data.src.id})));
+                globalEnrichedPool = globalEnrichedPool.concat(enrichedForSource.map(v => ({
+                    ...v,
+                    sourcePriority: data.src.priority,
+                    sourceId: data.src.id,
+                    sourceInstanceId: data.src.instanceId || data.src.id
+                })));
            }
       }
       
@@ -494,16 +499,17 @@ export const QueueDrawer = {
       // Remove used IDs from local pools
       const usedIdsBySource = {};
       finalInsert.forEach(v => {
-          if (v.sourceId) {
-              if (!usedIdsBySource[v.sourceId]) usedIdsBySource[v.sourceId] = [];
-              usedIdsBySource[v.sourceId].push(v.id);
+          const key = v.sourceInstanceId || v.sourceId;
+          if (key) {
+              if (!usedIdsBySource[key]) usedIdsBySource[key] = [];
+              usedIdsBySource[key].push(v.id);
           }
       });
       
-      for (const sourceId in usedIdsBySource) {
-          const pool = await HistoryStore.getPool(sourceId);
-          pool.ids = pool.ids.filter(id => !usedIdsBySource[sourceId].includes(id));
-          await HistoryStore.savePool(sourceId, pool);
+      for (const key in usedIdsBySource) {
+          const pool = await HistoryStore.getPool(key);
+          pool.ids = pool.ids.filter(id => !usedIdsBySource[key].includes(id));
+          await HistoryStore.savePool(key, pool);
       }
       
       QueueEngine.smartInsert(finalInsert, toTop);
@@ -552,7 +558,7 @@ export const QueueDrawer = {
                 rawVideos = await YouTubeApi.fetchPlaylistItems(targetId, 50);
             }
 
-            const pool = await HistoryStore.getPool(src.id);
+            const pool = await HistoryStore.getPool(src.instanceId || src.id);
             const videoIds = rawVideos.map(v => v.id);
             let details = [];
             if (videoIds.length > 0) details = await YouTubeApi.fetchVideoDetails(videoIds);
@@ -576,10 +582,10 @@ export const QueueDrawer = {
 
             if (newIds.length > 0) {
                 pool.ids.push(...newIds);
-                await HistoryStore.savePool(src.id, pool);
+                await HistoryStore.savePool(src.instanceId || src.id, pool);
                 totalNewFound += newIds.length;
 
-                const labelEl = document.querySelector(`.pool-count-label[data-source-id="${src.id}"]`);
+                const labelEl = document.querySelector(`.pool-count-label[data-source-instance-id="${src.instanceId || src.id}"]`);
                 if (labelEl) labelEl.innerHTML = `Pool: ${pool.ids.length}`;
             }
         } catch (e) {

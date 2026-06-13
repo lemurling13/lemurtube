@@ -7,6 +7,10 @@ let player;
 let isYoutubeApiReady = false;
 
 function initMainApp() {
+  // Apply theme immediately on startup
+  const initialTheme = SettingsStore.getTheme();
+  document.documentElement.setAttribute('data-theme', initialTheme);
+
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('./sw.js')
       .then(() => console.log('Service Worker Registered'))
@@ -74,8 +78,39 @@ function initMainApp() {
     
     // Populate API Key from storage
     document.getElementById('input-youtube-api-key').value = SettingsStore.getYoutubeApiKey();
+
+    // Update theme toggle buttons highlight
+    updateThemeButtonsUI(SettingsStore.getTheme());
   });
 
+  const btnThemeDark = document.getElementById('btn-theme-dark');
+  const btnThemeLight = document.getElementById('btn-theme-light');
+
+  function updateThemeButtonsUI(theme) {
+    if (theme === 'light') {
+      btnThemeLight.classList.remove('secondary-btn');
+      btnThemeLight.classList.add('primary-btn');
+      btnThemeDark.classList.remove('primary-btn');
+      btnThemeDark.classList.add('secondary-btn');
+    } else {
+      btnThemeDark.classList.remove('secondary-btn');
+      btnThemeDark.classList.add('primary-btn');
+      btnThemeLight.classList.remove('primary-btn');
+      btnThemeLight.classList.add('secondary-btn');
+    }
+  }
+
+  btnThemeDark.addEventListener('click', () => {
+    SettingsStore.setTheme('dark');
+    document.documentElement.setAttribute('data-theme', 'dark');
+    updateThemeButtonsUI('dark');
+  });
+
+  btnThemeLight.addEventListener('click', () => {
+    SettingsStore.setTheme('light');
+    document.documentElement.setAttribute('data-theme', 'light');
+    updateThemeButtonsUI('light');
+  });
 
   document.getElementById('btn-close-settings').addEventListener('click', () => {
     views.settings.classList.remove('active');
@@ -482,7 +517,7 @@ async function populateShelvesMenuPools() {
             let total = 0;
             for (const s of bucket.sources) {
                 if (s.id && s.id.length > 5) {
-                    const pool = await HistoryStore.getPool(s.id);
+                    const pool = await HistoryStore.getPool(s.instanceId || s.id);
                     total += pool.ids ? pool.ids.length : 0;
                 }
             }
@@ -525,6 +560,7 @@ function renderShelfEditorSources() {
         const el = document.createElement('div');
         el.className = 'source-editor';
         el.setAttribute('data-index', srcIndex);
+        el.setAttribute('data-instance-id', src.instanceId || '');
         el.setAttribute('data-meta-title', src.metaTitle || '');
         el.setAttribute('data-meta-thumb', src.metaThumb || '');
         
@@ -534,11 +570,11 @@ function renderShelfEditorSources() {
                 <button class="icon-btn btn-delete-src" data-index="${srcIndex}" style="color:var(--danger-color); font-size:1rem;">X</button>
             </div>
             <div style="display:flex; justify-content:space-between; align-items:center; margin-top:4px; margin-bottom:8px;">
-                <span class="pool-count-label" data-source-id="${src.id || ''}">Pool: ...</span>
+                <span class="pool-count-label" data-source-instance-id="${src.instanceId || src.id || ''}">Pool: ...</span>
                 <div style="display:flex; gap: 6px;">
-                    <button class="secondary-btn btn-focus-src" data-source-id="${src.id || ''}" style="padding:2px 6px; font-size:0.75rem; border-color:#8844ff; background:transparent; color:#aa77ff;" title="Play this source exclusively">🎯 Focus</button>
-                    <button class="secondary-btn btn-reset-pool" data-source-id="${src.id || ''}" style="padding:2px 6px; font-size:0.75rem; border-color:#444; background:transparent; color:#888;">♻️ Reset</button>
-                    <button class="secondary-btn btn-dig-src" data-source-id="${src.id || ''}" style="padding:2px 8px; font-size:0.8rem;">⛏️ Dig</button>
+                    <button class="secondary-btn btn-focus-src" data-source-instance-id="${src.instanceId || src.id || ''}" style="padding:2px 6px; font-size:0.75rem; border-color:#8844ff; background:transparent; color:#aa77ff;" title="Play this source exclusively">🎯 Focus</button>
+                    <button class="secondary-btn btn-reset-pool" data-source-instance-id="${src.instanceId || src.id || ''}" style="padding:2px 6px; font-size:0.75rem; border-color:#444; background:transparent; color:#888;">♻️ Reset</button>
+                    <button class="secondary-btn btn-dig-src" data-source-instance-id="${src.instanceId || src.id || ''}" style="padding:2px 8px; font-size:0.8rem;">⛏️ Dig</button>
                 </div>
             </div>
 
@@ -625,8 +661,11 @@ async function bindSourceConfigEvents() {
     const digBtns = container.querySelectorAll('.btn-dig-src');
     digBtns.forEach(btn => {
         btn.addEventListener('click', async (e) => {
-            const sourceId = e.target.getAttribute('data-source-id');
-            if (!sourceId || sourceId.length <= 5) {
+            const sourceInstanceId = e.target.getAttribute('data-source-instance-id');
+            const activeBucket = SettingsStore.getBuckets().find(b => b.id === currentlyEditingBucketId);
+            const sourceConfig = activeBucket ? activeBucket.sources.find(s => s.instanceId === sourceInstanceId) : null;
+            
+            if (!sourceConfig || !sourceConfig.id || sourceConfig.id.length <= 5) {
                 alert('Please enter a valid Source ID and save first.');
                 return;
             }
@@ -634,11 +673,10 @@ async function bindSourceConfigEvents() {
             e.target.innerHTML = 'Digging...';
             e.target.disabled = true;
             try {
-                const pool = await HistoryStore.getPool(sourceId);
-                const activeBucket = SettingsStore.getBuckets().find(b => b.id === currentlyEditingBucketId);
-                const sourceConfig = activeBucket ? activeBucket.sources.find(s => s.id === sourceId) : null;
+                const poolKey = sourceConfig.instanceId || sourceConfig.id;
+                const pool = await HistoryStore.getPool(poolKey);
                 
-                const targetId = await YouTubeApi.resolveChannelId(sourceId);
+                const targetId = await YouTubeApi.resolveChannelId(sourceConfig.id);
                 if (!targetId) {
                     alert('Could not resolve handle or ID.');
                     return;
@@ -646,7 +684,7 @@ async function bindSourceConfigEvents() {
 
                 let rawVideos = [];
                 if (targetId.startsWith('UC') || targetId.startsWith('UCA')) {
-                    if (sourceConfig && sourceConfig.keywords && sourceConfig.keywords.trim()) {
+                    if (sourceConfig.keywords && sourceConfig.keywords.trim()) {
                         rawVideos = await YouTubeApi.fetchSearchByChannelId(targetId, sourceConfig.keywords, 50, pool.nextPageToken);
                     } else {
                         let mappedId = targetId;
@@ -686,10 +724,10 @@ async function bindSourceConfigEvents() {
                 const totalResults = rawVideos.totalResults || 0;
                 const totalPages = Math.ceil(totalResults / 50) || 1;
                 
-                await HistoryStore.savePool(sourceId, pool);
+                await HistoryStore.savePool(poolKey, pool);
                 alert(`Found ${newIds.length} new vetted videos!\nArchive Progress: Page ${pool.currentPageIndex} of ${totalPages}`);
                 
-                const labelEl = container.querySelector(`.pool-count-label[data-source-id="${sourceId}"]`);
+                const labelEl = container.querySelector(`.pool-count-label[data-source-instance-id="${poolKey}"]`);
                 if (labelEl) labelEl.innerHTML = `Pool: ${pool.ids.length}`;
             } catch (err) {
                 console.error('Dig failed:', err);
@@ -704,8 +742,12 @@ async function bindSourceConfigEvents() {
     const resetBtns = container.querySelectorAll('.btn-reset-pool');
     resetBtns.forEach(btn => {
         btn.addEventListener('click', async (e) => {
-            const sourceId = e.target.getAttribute('data-source-id');
-            if (!sourceId) return;
+            const sourceInstanceId = e.target.getAttribute('data-source-instance-id');
+            if (!sourceInstanceId) return;
+            
+            const activeBucket = SettingsStore.getBuckets().find(b => b.id === currentlyEditingBucketId);
+            const sourceConfig = activeBucket ? activeBucket.sources.find(s => s.instanceId === sourceInstanceId) : null;
+            const channelId = sourceConfig ? sourceConfig.id : '';
             
             const sourceEditorNode = e.target.closest('.source-editor');
             const metaTitle = sourceEditorNode ? sourceEditorNode.getAttribute('data-meta-title') : '';
@@ -713,13 +755,15 @@ async function bindSourceConfigEvents() {
             if (confirm('Clear all cached videos in this pool and start over?')) {
                 const clearHistory = confirm('Do you also want to clear all watched/dismissed history for this channel/source? (This will let you see the videos again.)');
                 if (clearHistory) {
-                    await HistoryStore.resetSourceHistory(sourceId, metaTitle);
-                    const labelEl = container.querySelector(`.pool-count-label[data-source-id="${sourceId}"]`);
+                    if (channelId) {
+                        await HistoryStore.resetSourceHistory(channelId, metaTitle);
+                    }
+                    const labelEl = container.querySelector(`.pool-count-label[data-source-instance-id="${sourceInstanceId}"]`);
                     if (labelEl) labelEl.innerHTML = `Pool: 0`;
                     alert('Pool and watch history cleared.');
                 } else {
-                    await HistoryStore.clearPool(sourceId);
-                    const labelEl = container.querySelector(`.pool-count-label[data-source-id="${sourceId}"]`);
+                    await HistoryStore.clearPool(sourceInstanceId);
+                    const labelEl = container.querySelector(`.pool-count-label[data-source-instance-id="${sourceInstanceId}"]`);
                     if (labelEl) labelEl.innerHTML = `Pool: 0`;
                     alert('Pool cleared.');
                 }
@@ -730,12 +774,12 @@ async function bindSourceConfigEvents() {
     const focusBtns = container.querySelectorAll('.btn-focus-src');
     focusBtns.forEach(btn => {
         btn.addEventListener('click', async (e) => {
-            const sourceId = e.target.getAttribute('data-source-id');
-            if (!sourceId) return;
+            const sourceInstanceId = e.target.getAttribute('data-source-instance-id');
+            if (!sourceInstanceId) return;
             
             e.target.disabled = true;
             try {
-                const pool = await HistoryStore.getPool(sourceId);
+                const pool = await HistoryStore.getPool(sourceInstanceId);
                 const cleanIds = [];
                 for (const id of pool.ids) {
                     if (await HistoryStore.isWatched(id) || await HistoryStore.isDismissed(id)) continue;
@@ -751,7 +795,7 @@ async function bindSourceConfigEvents() {
                 const buckets = SettingsStore.getBuckets();
                 const activeBucket = buckets.find(b => b.id === currentlyEditingBucketId);
                 if (!activeBucket) return;
-                const srcConfig = activeBucket.sources.find(s => s.id === sourceId);
+                const srcConfig = activeBucket.sources.find(s => s.instanceId === sourceInstanceId);
                 
                 const rawVideos = targetIds.map(id => ({ id }));
                 const enriched = await QueueEngine.filterAndEnrichVideos(rawVideos, activeBucket, srcConfig);
@@ -765,11 +809,12 @@ async function bindSourceConfigEvents() {
                 QueueEngine.setQueue(enriched.map(v => ({
                     ...v,
                     sourcePriority: srcConfig?.priority || 'medium',
-                    sourceId: sourceId
+                    sourceId: srcConfig?.id || '',
+                    sourceInstanceId: sourceInstanceId
                 })));
                 
                 pool.ids = pool.ids.filter(id => !targetIds.includes(id));
-                await HistoryStore.savePool(sourceId, pool);
+                await HistoryStore.savePool(sourceInstanceId, pool);
                 
                 document.getElementById('shelf-editor-modal').classList.add('hidden');
                 
@@ -789,9 +834,9 @@ async function bindSourceConfigEvents() {
 
     const labels = container.querySelectorAll('.pool-count-label');
     for (const label of labels) {
-        const sourceId = label.getAttribute('data-source-id');
-        if (sourceId && sourceId.length > 5) {
-            const pool = await HistoryStore.getPool(sourceId);
+        const sourceInstanceId = label.getAttribute('data-source-instance-id');
+        if (sourceInstanceId && sourceInstanceId.length > 5) {
+            const pool = await HistoryStore.getPool(sourceInstanceId);
             label.innerHTML = `Pool: ${pool.ids.length}`;
         } else {
             label.innerHTML = `Pool: 0`;
@@ -806,6 +851,7 @@ function saveModalStateToMemory() {
     const sources = [];
     srcNodes.forEach(node => {
         sources.push({
+            instanceId: node.getAttribute('data-instance-id') || 'src_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now().toString(36),
             id: node.querySelector('.s-id').value,
             keywords: node.querySelector('.s-keywords').value,
             shortsConstraint: node.querySelector('.s-shorts').value,
@@ -852,7 +898,14 @@ function initModalHandlers() {
         const current = SettingsStore.getBuckets();
         const target = current.find(cb => cb.id === currentlyEditingBucketId);
         if (target) {
-            target.sources.push({ id:'', keywords:'', shortsConstraint:'mix', recency:'all', priority:'medium' });
+            target.sources.push({ 
+                instanceId: 'src_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now().toString(36),
+                id:'', 
+                keywords:'', 
+                shortsConstraint:'mix', 
+                recency:'all', 
+                priority:'medium' 
+            });
             SettingsStore.setBuckets(current);
             renderShelfEditorSources();
         }
