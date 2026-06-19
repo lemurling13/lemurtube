@@ -1,4 +1,4 @@
-import { SettingsStore } from '../db/storage.js';
+import { SettingsStore, HistoryStore } from '../db/storage.js';
 
 const BASE_URL = 'https://www.googleapis.com/youtube/v3';
 
@@ -139,9 +139,17 @@ export const YouTubeApi = {
   async fetchVideoDetails(videoIds) {
     if (!videoIds || videoIds.length === 0) return [];
     
+    const cached = await HistoryStore.getVideoDetailsBatch(videoIds);
+    const cachedIds = new Set(cached.map(c => c.id));
+    const missingIds = videoIds.filter(id => !cachedIds.has(id));
+    
+    if (missingIds.length === 0) {
+      return cached;
+    }
+    
     const chunks = [];
-    for (let i = 0; i < videoIds.length; i += 50) {
-      chunks.push(videoIds.slice(i, i + 50).join(','));
+    for (let i = 0; i < missingIds.length; i += 50) {
+      chunks.push(missingIds.slice(i, i + 50).join(','));
     }
     
     const allVideos = [];
@@ -150,10 +158,10 @@ export const YouTubeApi = {
         part: 'contentDetails,snippet',
         id: chunk
       });
-      allVideos.push(...data.items);
+      if (data && data.items) allVideos.push(...data.items);
     }
     
-    return allVideos.map(v => ({
+    const newlyFetched = allVideos.map(v => ({
       id: v.id,
       title: v.snippet.title,
       channelId: v.snippet.channelId,
@@ -163,6 +171,10 @@ export const YouTubeApi = {
       durationSec: parseDuration(v.contentDetails.duration)
     }));
 
-
+    if (newlyFetched.length > 0) {
+      await HistoryStore.saveVideoDetailsBatch(newlyFetched);
+    }
+    
+    return [...cached, ...newlyFetched];
   }
 };

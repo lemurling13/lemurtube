@@ -127,7 +127,7 @@ export const SettingsStore = {
 
 export const HistoryStore = {
   dbName: 'LemurTubeHistory',
-  version: 3,
+  version: 4,
   db: null,
   initPromise: null,
   cachedWatched: null,
@@ -164,6 +164,9 @@ export const HistoryStore = {
         }
         if (!db.objectStoreNames.contains('source_pools')) {
           db.createObjectStore('source_pools', { keyPath: 'sourceId' });
+        }
+        if (!db.objectStoreNames.contains('video_details')) {
+          db.createObjectStore('video_details', { keyPath: 'id' });
         }
       };
 
@@ -247,6 +250,7 @@ export const HistoryStore = {
     if (!item.id) return;
     if (!this.db) await this.init();
     if (this.cachedWatched) this.cachedWatched.add(item.id);
+    await this.cleanPoolsAndDetails(item.id);
     return new Promise((resolve, reject) => {
       try {
         const tx = this.db.transaction('watched', 'readwrite');
@@ -292,6 +296,7 @@ export const HistoryStore = {
     if (!item.id) return;
     if (!this.db) await this.init();
     if (this.cachedDismissed) this.cachedDismissed.add(item.id);
+    await this.cleanPoolsAndDetails(item.id);
     return new Promise((resolve, reject) => {
       try {
         const tx = this.db.transaction('dismissed', 'readwrite');
@@ -469,5 +474,96 @@ export const HistoryStore = {
     
     await cleanStore('watched');
     await cleanStore('dismissed');
+  },
+
+  async getVideoDetailsBatch(ids) {
+    if (!ids || ids.length === 0) return [];
+    if (!this.db) await this.init();
+    return new Promise((resolve) => {
+      try {
+        const tx = this.db.transaction('video_details', 'readonly');
+        const store = tx.objectStore('video_details');
+        const results = [];
+        let completed = 0;
+        ids.forEach(id => {
+          const req = store.get(id);
+          req.onsuccess = () => {
+            if (req.result) results.push(req.result);
+            completed++;
+            if (completed === ids.length) resolve(results);
+          };
+          req.onerror = () => {
+            completed++;
+            if (completed === ids.length) resolve(results);
+          };
+        });
+      } catch (e) {
+        resolve([]);
+      }
+    });
+  },
+
+  async saveVideoDetailsBatch(items) {
+    if (!items || items.length === 0) return;
+    if (!this.db) await this.init();
+    return new Promise((resolve) => {
+      try {
+        const tx = this.db.transaction('video_details', 'readwrite');
+        const store = tx.objectStore('video_details');
+        items.forEach(item => {
+          if (item && item.id) store.put(item);
+        });
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => resolve();
+      } catch (e) {
+        resolve();
+      }
+    });
+  },
+
+  async deleteVideoDetails(id) {
+    if (!id) return;
+    if (!this.db) await this.init();
+    return new Promise((resolve) => {
+      try {
+        const tx = this.db.transaction('video_details', 'readwrite');
+        tx.objectStore('video_details').delete(id);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => resolve();
+      } catch (e) {
+        resolve();
+      }
+    });
+  },
+
+  async cleanPoolsAndDetails(videoId) {
+    if (!videoId) return;
+    const buckets = SettingsStore.getBuckets() || [];
+    let isStillInSomePool = false;
+
+    for (const bucket of buckets) {
+      if (!bucket.sources) continue;
+      for (const src of bucket.sources) {
+        const key = src.instanceId || src.id;
+        if (!key) continue;
+        const pool = await this.getPool(key);
+        if (!pool || !pool.ids) continue;
+
+        if (src.isRepeatable) {
+          if (pool.ids.includes(videoId)) {
+            isStillInSomePool = true;
+          }
+        } else {
+          if (pool.ids.includes(videoId)) {
+            pool.ids = pool.ids.filter(id => id !== videoId);
+            await this.savePool(key, pool);
+          }
+        }
+      }
+    }
+
+    if (!isStillInSomePool) {
+      await this.deleteVideoDetails(videoId);
+    }
   }
 };

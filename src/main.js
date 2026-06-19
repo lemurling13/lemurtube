@@ -813,8 +813,10 @@ async function bindSourceConfigEvents() {
                     sourceInstanceId: sourceInstanceId
                 })));
                 
-                pool.ids = pool.ids.filter(id => !targetIds.includes(id));
-                await HistoryStore.savePool(sourceInstanceId, pool);
+                if (cleanIds.length !== pool.ids.length) {
+                    pool.ids = cleanIds;
+                    await HistoryStore.savePool(sourceInstanceId, pool);
+                }
                 
                 document.getElementById('shelf-editor-modal').classList.add('hidden');
                 

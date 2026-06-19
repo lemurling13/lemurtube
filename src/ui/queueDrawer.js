@@ -394,8 +394,9 @@ export const QueueDrawer = {
               pool.ids = cleanIds;
               await HistoryStore.savePool(src.instanceId || src.id, pool);
           }
-          // Take top 50 candidates to give lottery pool rich variety
-          const candidates = pool.ids.slice(0, 50).map(id => ({ id }));
+          const currentQueueIds = QueueEngine.getQueue().map(v => v.id);
+          const availableIds = pool.ids.filter(id => !currentQueueIds.includes(id));
+          const candidates = availableIds.slice(0, 50).map(id => ({ id }));
           return { src, rawVideos: candidates };
       });
 
@@ -495,22 +496,6 @@ export const QueueDrawer = {
           }
       }
 
-      
-      // Remove used IDs from local pools
-      const usedIdsBySource = {};
-      finalInsert.forEach(v => {
-          const key = v.sourceInstanceId || v.sourceId;
-          if (key) {
-              if (!usedIdsBySource[key]) usedIdsBySource[key] = [];
-              usedIdsBySource[key].push(v.id);
-          }
-      });
-      
-      for (const key in usedIdsBySource) {
-          const pool = await HistoryStore.getPool(key);
-          pool.ids = pool.ids.filter(id => !usedIdsBySource[key].includes(id));
-          await HistoryStore.savePool(key, pool);
-      }
       
       QueueEngine.smartInsert(finalInsert, toTop);
       this.sortQueue();
