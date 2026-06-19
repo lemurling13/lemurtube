@@ -676,6 +676,11 @@ async function bindSourceConfigEvents() {
                 const poolKey = sourceConfig.instanceId || sourceConfig.id;
                 const pool = await HistoryStore.getPool(poolKey);
                 
+                if (pool.isExhausted) {
+                    alert('This source has already been completely archived (reached the end of available YouTube search/playlist results). Reset source history if you want to re-dig from scratch.');
+                    return;
+                }
+                
                 const targetId = await YouTubeApi.resolveChannelId(sourceConfig.id);
                 if (!targetId) {
                     alert('Could not resolve handle or ID.');
@@ -721,11 +726,13 @@ async function bindSourceConfigEvents() {
                 pool.nextPageToken = rawVideos.nextPageToken || '';
                 pool.currentPageIndex = (pool.currentPageIndex || 0) + 1;
                 
-                const totalResults = rawVideos.totalResults || 0;
-                const totalPages = Math.ceil(totalResults / 50) || 1;
+                if (!pool.nextPageToken) {
+                    pool.isExhausted = true;
+                }
                 
                 await HistoryStore.savePool(poolKey, pool);
-                alert(`Found ${newIds.length} new vetted videos!\nArchive Progress: Page ${pool.currentPageIndex} of ${totalPages}`);
+                const statusStr = pool.isExhausted ? 'All available pages archived!' : `Page ${pool.currentPageIndex}`;
+                alert(`Found ${newIds.length} new vetted videos!\nArchive Status: ${statusStr}`);
                 
                 const labelEl = container.querySelector(`.pool-count-label[data-source-instance-id="${poolKey}"]`);
                 if (labelEl) labelEl.innerHTML = `Pool: ${pool.ids.length}`;
@@ -755,9 +762,7 @@ async function bindSourceConfigEvents() {
             if (confirm('Clear all cached videos in this pool and start over?')) {
                 const clearHistory = confirm('Do you also want to clear all watched/dismissed history for this channel/source? (This will let you see the videos again.)');
                 if (clearHistory) {
-                    if (channelId) {
-                        await HistoryStore.resetSourceHistory(channelId, metaTitle);
-                    }
+                    await HistoryStore.resetSourceHistory(sourceInstanceId, channelId, metaTitle);
                     const labelEl = container.querySelector(`.pool-count-label[data-source-instance-id="${sourceInstanceId}"]`);
                     if (labelEl) labelEl.innerHTML = `Pool: 0`;
                     alert('Pool and watch history cleared.');

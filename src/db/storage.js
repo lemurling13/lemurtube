@@ -454,26 +454,30 @@ export const HistoryStore = {
     });
   },
 
-  async resetSourceHistory(sourceId, channelTitle) {
+  async resetSourceHistory(sourceInstanceId, channelId, channelTitle) {
     if (!this.db) await this.init();
     
-    // Clear pool
-    await this.clearPool(sourceId);
+    await this.clearPool(sourceInstanceId);
+    if (channelId && channelId !== sourceInstanceId) {
+      await this.clearPool(channelId);
+    }
     
-    const cleanStore = async (storeName) => {
+    const cleanStore = async (storeName, cacheSet) => {
       const allItems = await this.getAllStore(storeName);
       const toRemove = allItems.filter(item => {
-        return (item.channelId && item.channelId === sourceId) || 
-               (item.channelTitle && channelTitle && item.channelTitle.toLowerCase() === channelTitle.toLowerCase());
+        const matchChannelId = (channelId && item.channelId === channelId) || (sourceInstanceId && item.channelId === sourceInstanceId);
+        const matchTitle = channelTitle && item.channelTitle && item.channelTitle.toLowerCase().includes(channelTitle.toLowerCase());
+        return matchChannelId || matchTitle;
       });
       
       for (const item of toRemove) {
         await this.removeFromStore(storeName, item.id);
+        if (cacheSet) cacheSet.delete(item.id);
       }
     };
     
-    await cleanStore('watched');
-    await cleanStore('dismissed');
+    await cleanStore('watched', this.cachedWatched);
+    await cleanStore('dismissed', this.cachedDismissed);
   },
 
   async getVideoDetailsBatch(ids) {
