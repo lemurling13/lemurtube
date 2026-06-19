@@ -396,7 +396,26 @@ export const QueueDrawer = {
           }
           const currentQueueIds = QueueEngine.getQueue().map(v => v.id);
           const availableIds = pool.ids.filter(id => !currentQueueIds.includes(id));
-          const candidates = availableIds.slice(0, 50).map(id => ({ id }));
+          
+          const cachedDetails = await HistoryStore.getVideoDetailsBatch(availableIds);
+          const detailsMap = new Map(cachedDetails.map(d => [d.id, d]));
+          let sortedIds = [...availableIds];
+          if (this.sortState === 'oldest') {
+              sortedIds.sort((a, b) => {
+                  const da = detailsMap.get(a)?.publishedAt || '9999-12-31';
+                  const db = detailsMap.get(b)?.publishedAt || '9999-12-31';
+                  return new Date(da) - new Date(db);
+              });
+          } else if (this.sortState === 'newest') {
+              sortedIds.sort((a, b) => {
+                  const da = detailsMap.get(a)?.publishedAt || '1970-01-01';
+                  const db = detailsMap.get(b)?.publishedAt || '1970-01-01';
+                  return new Date(db) - new Date(da);
+              });
+          } else if (this.sortState === 'random') {
+              sortedIds.sort(() => Math.random() - 0.5);
+          }
+          const candidates = sortedIds.slice(0, 50).map(id => ({ id }));
           return { src, rawVideos: candidates };
       });
 
@@ -443,11 +462,6 @@ export const QueueDrawer = {
       }
 
 
-      for (let i = globalEnrichedPool.length - 1; i > 0; i--) {
-         const j = Math.floor(Math.random() * (i + 1));
-         [globalEnrichedPool[i], globalEnrichedPool[j]] = [globalEnrichedPool[j], globalEnrichedPool[i]];
-      }
-
       const finalInsert = [];
       const sourcesPools = {};
       
@@ -456,6 +470,16 @@ export const QueueDrawer = {
           if (v.sourceId) {
               if (!sourcesPools[v.sourceId]) sourcesPools[v.sourceId] = [];
               sourcesPools[v.sourceId].push(v);
+          }
+      });
+
+      Object.values(sourcesPools).forEach(pool => {
+          if (this.sortState === 'oldest') {
+              pool.sort((a, b) => new Date(a.publishedAt || 0) - new Date(b.publishedAt || 0));
+          } else if (this.sortState === 'newest') {
+              pool.sort((a, b) => new Date(b.publishedAt || 0) - new Date(a.publishedAt || 0));
+          } else if (this.sortState === 'random') {
+              pool.sort(() => Math.random() - 0.5);
           }
       });
 
