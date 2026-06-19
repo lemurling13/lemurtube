@@ -10,7 +10,7 @@
   <link rel="icon" href="./assets/icon-192.png" type="image/png">
   <link rel="apple-touch-icon" href="./assets/icon-192.png">
 
-  <link rel="stylesheet" href="src/styles/index.css">
+  <link rel="stylesheet" href="src/styles/index.css?v=3.0.22">
 </head>
 <body>
   
@@ -128,8 +128,9 @@
             <p class="help-text" style="font-size: 0.8em; margin-top: 4px;">This key is stored securely on your device and never uploaded to the repository.</p>
         </div>
 
-        <div style="text-align: center; margin-top: 32px; padding-top: 16px; border-top: 1px solid var(--border-color); color: var(--text-secondary); font-size: 0.8rem; font-family: monospace;">
-            LemurTube Curator v3.0.21
+        <div style="text-align: center; margin-top: 32px; padding-top: 16px; border-top: 1px solid var(--border-color); color: var(--text-secondary); font-size: 0.8rem; font-family: monospace; display:flex; justify-content:center; align-items:center; gap:8px;">
+            <span>LemurTube Curator v3.0.22</span>
+            <button id="btn-app-update" style="background:none; border:none; color:#aa77ff; cursor:pointer; font-size:0.8rem; text-decoration:underline;">🔄 Update App</button>
         </div>
       </div>
     </section>
@@ -219,6 +220,6 @@
   <!-- YouTube IFrame API -->
   <script src="https://www.youtube.com/iframe_api"></script>
   <!-- Application Logic -->
-  <script type="module" src="src/main.js"></script>
+  <script type="module" src="src/main.js?v=3.0.22"></script>
 </body>
 </html>

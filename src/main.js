@@ -341,6 +341,28 @@ function initMainApp() {
   });
 
 
+  const updateBtn = document.getElementById('btn-app-update');
+  if (updateBtn) {
+    updateBtn.addEventListener('click', async () => {
+      if (confirm('Download newest app code and refresh?')) {
+        try {
+          if ('serviceWorker' in navigator) {
+            const regs = await navigator.serviceWorker.getRegistrations();
+            for (const r of regs) await r.update();
+          }
+          if ('caches' in window) {
+            const keys = await caches.keys();
+            for (const k of keys) await caches.delete(k);
+          }
+          window.location.reload(true);
+        } catch (e) {
+          console.error('Update failed:', e);
+          window.location.reload(true);
+        }
+      }
+    });
+  }
+
   renderShelvesMenu();
   populateBucketSelector();
 
